@@ -24,7 +24,7 @@
 #include <linux/init.h>
 #include <linux/usb/input.h>
 #include <linux/hid.h>
-#include <generated/uapi/linux/version.h>
+#include <linux/version.h>
 
 /* for apple IDs */
 /*                                                              //Leetmouse Mod BEGIN
