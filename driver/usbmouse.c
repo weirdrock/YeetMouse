@@ -170,7 +170,12 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
     unsigned int n = 0;
     size_t offset = offsetof(struct hid_descriptor, desc);
 
-                                                                //Leetmouse Mod END
+    if(strstr(dev->product, "Keyboard")) { // This caused issues with keyboard media buttons / volume roller
+        printk("Probed product is a kb, not a mouse! (%s)\n", dev->product);
+        return 1;
+    }
+
+    //Leetmouse Mod END
     interface = intf->cur_altsetting;
 
     if (interface->desc.bNumEndpoints != 1)

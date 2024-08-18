@@ -1,11 +1,11 @@
 * Description
-  The =LEETMOUSE= kernelmodule enables quake-live like acceleration for your mouse on Linux and is heavily inspired by previous works from [[http://accel.drok-radnik.com/old.html][Povohat's mouse driver for Windows.]]
+  The =LEETMOUSE= kernelmodule enables different acceleration modes for your mouse on Linux and is heavily inspired by previous works from [[http://accel.drok-radnik.com/old.html][Povohat's mouse driver for Windows.]]
   =LEETMOUSE= basically fuses the original [[https://github.com/torvalds/linux/blob/master/drivers/hid/usbhid/usbmouse.c][Linux USB mouse driver]] code with the acceleration code-base and has been initially developed by [[https://github.com/chilliams][Christopher Williams]].
-  Since the [[https://github.com/chilliams/mousedriver][original work]] was in a rough state and seem to have been abandonned, this fork has been started.
+  Since the [[https://github.com/chilliams/mousedriver][original work]] was in a rough state and seem to have been abandoned, this fork has been started.
 
 * Installation & Uninstallation
 ** Preparation & Configuration
-   + Clone this repository, copy =driver/config.sample.h= to =/driver/config.h= and edit it in your favorite text editor. Change the defines at the top of config.h to match your desired acceleration settings.
+   + Clone this repository, copy =driver/config.sample.h= to =/driver/config.h= and edit it in your favorite text editor. Change the defines at the top of config.h to match your desired acceleration settings. But keep in mind that, the values in the config.h have to be the long long representations of their Fixed-Point data (limitation of C compile time constants), so it might be better to just do everything from the GUI.
    + Make sure, you have the required toolchains (e.g. =base-devel= on Arch or =build-essentials= on Debian) installed as well as the =linux-headers= for your installed kernel.
 ** Arch/Manjaro
    Since the maintainer of =LEETMOUSE= is an Arch and Manjaro user, a =PKGBUILD= has been written for seamless integration into pacman.
@@ -65,12 +65,14 @@
    You can take a look at =/scripts/bind.sh= for an example on how to determine your mouse's USB address for that. However using the udev rules for development is advised.
 
 * TODOS
-  | GUI to configure the acceleration parameters                       | Current priority                                                   |
-  | AUR package release                                                | Once it reaches version 1.0 (basically after having a working GUI) |
+  | Optimize some Fixed-Point functions                                | Shouldn't be a huge problem                                        |
+  | AUR package release                                                | Once it reaches version 1.0 (basically after Im happy with it)     |
   | dpkg package for Debian based systems                              | After AUR release                                                  |
-  | Feature parity with Povohats driver and later even RawAccel        | When I find time - Definitely after aboves milestones              |
+  | Feature parity with Povohats driver and later even RawAccel        | When I find time - Definitely after above milestones               |
+  | GUI to configure the acceleration parameters                       | Done                                                               |
+  | Move to Fixed-Point arithmetic                                     | Done                                                               |
   | External interface for dynamically pushing acceleration parameters | Done                                                               |
-  | Fixing the only [[https://github.com/systemofapwne/mousedriver/issues/2][vertical srolling bug]]                              | Done                                                               |
+  | Fixing the only [[https://github.com/systemofapwne/mousedriver/issues/2][vertical scrolling bug]]                                       | Done                                                               |
   | Easier installation & binding                                      | Done                                                               |
   | DKMS support                                                       | Done                                                               |
   | PKGBUILD for Arch based systems                                    | Done                                                               |
