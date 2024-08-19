@@ -3,6 +3,9 @@
   =LEETMOUSE= basically fuses the original [[https://github.com/torvalds/linux/blob/master/drivers/hid/usbhid/usbmouse.c][Linux USB mouse driver]] code with the acceleration code-base and has been initially developed by [[https://github.com/chilliams][Christopher Williams]].
   Since the [[https://github.com/chilliams/mousedriver][original work]] was in a rough state and seem to have been abandoned, this fork has been started.
 
+  #+CAPTION: Basic functions presentation
+   [[media/YeetMouseGithub.gif]]
+
 * Installation & Uninstallation
 ** Preparation & Configuration
    + Clone this repository, copy =driver/config.sample.h= to =/driver/config.h= and edit it in your favorite text editor. Change the defines at the top of config.h to match your desired acceleration settings. But keep in mind that, the values in the config.h have to be the long long representations of their Fixed-Point data (limitation of C compile time constants), so it might be better to just do everything from the GUI.

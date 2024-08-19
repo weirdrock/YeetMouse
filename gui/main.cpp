@@ -153,7 +153,7 @@ int OnGui() {
     /* ---------------------------- FUNCTION PLOT ---------------------------- */
     if(ImPlot::BeginPlot("Function Plot [Input / Output]", {-1, avail.y - 70})) {
         ImPlot::SetupAxis(ImAxis_X1, "Input Speed [counts / ms]");
-        ImPlot::SetupAxis(ImAxis_Y1, "Input / Output Speed Ratio");
+        ImPlot::SetupAxis(ImAxis_Y1, "Output / Input Speed Ratio");
 
         static float last_frame_speed = 0;
 
