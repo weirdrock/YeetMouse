@@ -166,7 +166,7 @@ int OnGui() {
         // Display currently applied parameters in the background
         if(was_initialized) {
             ImPlot::SetNextLineStyle(ImVec4(0.3, 0.3, 0.3, 1));
-            ImPlot::PlotLine("Function is use", functions[0].values, PLOT_POINTS, functions[0].x_stride);
+            ImPlot::PlotLine("Function in use", functions[0].values, PLOT_POINTS, functions[0].x_stride);
         }
 
         ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, 2);
