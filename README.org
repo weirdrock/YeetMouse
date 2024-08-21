@@ -67,6 +67,139 @@
    If you did not install the udev rules before via =sudo make udev_install= you need to manually bind your mouse to this driver.
    You can take a look at =/scripts/bind.sh= for an example on how to determine your mouse's USB address for that. However using the udev rules for development is advised.
 
+* Performance
+  #+CAPTION: Functions Performance Comparison
+   [[media/InstructionPerformance.png]]
+
+#+BEGIN_HTML
+<table><thead>
+  <tr>
+    <th>Instruction</th>
+    <th>Fixed-Point / FPU</th>
+    <th>Mop/s</th>
+    <th>ns/op</th>
+    <th>Clock cycles/op</th>
+  </tr></thead>
+<tbody>
+  <tr>
+    <td rowspan="3">Multiplication</td>
+    <td>Fixed-Point 64</td>
+    <td>542.905367</td>
+    <td>1.911</td>
+    <td>7.029038</td>
+  </tr>
+  <tr>
+    <td>Fixed-Point 64 (128bit)</td>
+    <td>540.682695</td>
+    <td>1.913</td>
+    <td>7.012462</td>
+  </tr>
+  <tr>
+    <td>FPU (double)</td>
+    <td>788.524105</td>
+    <td>1.29</td>
+    <td>4.722532</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Division</td>
+    <td>Fixed-Point 64 (Precise)</td>
+    <td>91.446419</td>
+    <td>11.299</td>
+    <td>41.756461</td>
+  </tr>
+  <tr>
+    <td>Fixed-Point 64 (128bit)</td>
+    <td>203.819151</td>
+    <td>5.097</td>
+    <td>18.797924</td>
+  </tr>
+  <tr>
+    <td>FPU (double)</td>
+    <td>188.035704</td>
+    <td>5.392</td>
+    <td>19.879064</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Exponent</td>
+    <td>Fixed-Point 64</td>
+    <td>66.550845</td>
+    <td>15.561</td>
+    <td>57.525454</td>
+  </tr>
+  <tr>
+    <td>Fixed-Point 64 (Fast)</td>
+    <td>92.775366</td>
+    <td>11.285</td>
+    <td>41.702182</td>
+  </tr>
+  <tr>
+    <td>FPU (double)</td>
+    <td>116.396443</td>
+    <td>8.741</td>
+    <td>32.276506</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Sqrt</td>
+    <td>Fixed-Point 64 (Precise)</td>
+    <td>18.059895</td>
+    <td>57.307</td>
+    <td>211.97892</td>
+  </tr>
+  <tr>
+    <td>Fixed-Point 64</td>
+    <td>64.558792</td>
+    <td>15.675</td>
+    <td>57.956097</td>
+  </tr>
+  <tr>
+    <td>FPU (double)</td>
+    <td>133.474534</td>
+    <td>7.9</td>
+    <td>29.179384</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Pow</td>
+    <td>Fixed-Point 64</td>
+    <td>31.81294</td>
+    <td>32.221</td>
+    <td>119.111214</td>
+  </tr>
+  <tr>
+    <td>Fixed-Point 64 (Fast)</td>
+    <td>40.524527</td>
+    <td>26.043</td>
+    <td>96.310556</td>
+  </tr>
+  <tr>
+    <td>FPU (double)</td>
+    <td>77.804544</td>
+    <td>17.113</td>
+    <td>63.251944</td>
+  </tr>
+  <tr>
+    <td rowspan="3">Log</td>
+    <td>Fixed-Point 64</td>
+    <td>51.117073</td>
+    <td>21.033</td>
+    <td>77.768302</td>
+  </tr>
+  <tr>
+    <td>Fixed-Point 64 (Fast)</td>
+    <td>61.341951</td>
+    <td>16.638</td>
+    <td>61.497848</td>
+  </tr>
+  <tr>
+    <td>FPU (double)</td>
+    <td>53.326065</td>
+    <td>19.876</td>
+    <td>73.491065</td>
+  </tr>
+</tbody></table>
+#+END_HTML
+
+**** /More in-depth performance and precision analysis can be found [[Performance.md][here]]/
+
 * TODOS
   | Optimize some Fixed-Point functions                                | Shouldn't be a huge problem                                        |
   | AUR package release                                                | Once it reaches version 1.0 (basically after Im happy with it)     |
