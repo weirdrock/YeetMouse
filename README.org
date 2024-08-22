@@ -67,7 +67,7 @@
    If you did not install the udev rules before via =sudo make udev_install= you need to manually bind your mouse to this driver.
    You can take a look at =/scripts/bind.sh= for an example on how to determine your mouse's USB address for that. However using the udev rules for development is advised.
 
-* Performance
+* Fixed-Point Analysis
   #+CAPTION: Functions Performance Comparison
    [[media/InstructionPerformance.png]]
 
@@ -198,7 +198,7 @@
 </tbody></table>
 #+END_HTML
 
-**** /More in-depth performance and precision analysis can be found [[Performance.md][here]]/
+**** /More in-depth performance and precision analysis can be found [[Performance.md][here]]/.
 
 * TODOS
   | Optimize some Fixed-Point functions                                | Shouldn't be a huge problem                                        |

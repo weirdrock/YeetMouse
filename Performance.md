@@ -1,5 +1,6 @@
 # Contents
 <!-- TOC -->
+* [Why even use Fixed-Point arithmetic?](#why-even-use-fixed-point-arithmetic)
 * [Benchmarking Methodology](#benchmarking-methodology)
     * [Testing Setup](#testing-setup)
     * [Performance](#performance)
@@ -18,10 +19,29 @@
     * [Log](#log)
 <!-- TOC -->
 
+# Why even use Fixed-Point arithmetic?
+It might sound pointless and even a bit silly if you've never tried writing kernel-level code that uses the FPU (or floating-point numbers in general).
+However, let's just say it can cause a lot of issues. Whenever you're performing some calculation, it might fail unexpectedly.
+Even if you've checked for the correct IRQ and aren't touching the client-side code, your numbers might just go bad. 
+If that happens, the best you can do is say, "Oh well... Let's just try it again." 
+As you might imagine, that's not something I want to deal with in a mouse driver that's meant to be fast and responsive.
+
+The second issue is precision. It's really not that great when you start dealing with things like exponents,
+where you might have a huge resulting number, but the fractional part could also be important for future calculations.
+This isn't a big issue for this application, as floating-point usually provides more than enough precision for the differences to be unnoticeable.
+
+The last concern is speed. This might not play a huge role since we don't do a lot of calculations,
+but we do perform them quite frequently (usually around 1,000 times a second). While the FPU is specifically optimized for complex floating-point operations and excels at them,
+it's not as fast for simple tasks like addition. Fixed-point numbers require a simple add instruction, whereas with the FPU,
+you need to call an actual function that handles the addition. 
+That's not too bad, but remember that you’re not computing acosh too often, right? On the other hand, addition and subtraction are used pretty frequently.
+I still don't think the difference of a couple of instructions is enough to bridge the gap between more complex operations, but at the end of the day,
+performance should be comparable.
+
 # Benchmarking Methodology
 ### Testing Setup
 All tests were run on *Ubuntu 24.04 LTS*, CPU: *AMD Ryzen 5900X* 3.7 GHz on a single thread in *Power Saver* mode (I have no idea what *Power Saver* mode does, I just have it on).  
-Code was compiled with the following flags: `-Wall -O2 -lgcc -mhard-float -lm -lc`  
+Code was compiled with the following flags: `-Wall -O2 -lgcc -mhard-float -lm -lc` (I used `-O2`, because that's what is used in the kernel)  
 For Performance tests, final result was an average of 10 loops, with 100ms delay between them, each for 100'000 iterations.  
 Keep in mind that these tests were **not** meant to determine (for example) the number of CPU instructions each function takes,
 but rather to compare the relative performance between functions that are meant to do the same.
@@ -41,7 +61,7 @@ static FP_LONG FP64_Exp2(FP_LONG x) {
 ```
 Taking care of such edge cases is not that easy, because if not dealt with properly, the function would simply return instantly, and the measurement would be useless.
 So I had to add stuff like this `v2 = FP64_ExpFast(v2) >> 30;` to avoid overflowing and early returning. This just `bitshifts` to the right by 30 places, meaning that we get at most 2 bits of integer values,
-and 30 bits of fraction part are discarded.
+and 30 bits of fractional part are discarded.
 Analyzing the assembly doesn't show this at all.
 The only way to detect this is by running tests, looking at the results and going like *huh... that can't be right.* And so I did.
 
@@ -57,7 +77,7 @@ printf("%.12lf", fabs(f1-f2)); // Print to the file
 
 The 2D tests were done in a similar fashion, just with 2 arguments for each of the functions.
 
-The range values for each test were chosen arbitrarily. Smalls one were meant to represent values up to about a hundred, while the big ones were usually up to the numerical limits of each function.
+The range values for each test were chosen arbitrarily. Small one were meant to represent values up to about a hundred, while the big ones were usually up to the numerical limits of the Fixed-Point type.
 
 # Use of 128-bit wide data types
 #### *These are available on 64bit systems only*
@@ -147,7 +167,7 @@ This just shows the minimum error of the benchmarking proces caused by type conv
 As you can see it's about 10⁻¹⁰, which is very little.
 
 ### Multiplication
-Here, results for 128-Bit and 64-Bit are exactly the same. Look [128-Bit](#128bit-enabled-fp64_mul) and [64-Bit](#default-fp64_mul) to see the difference in instructions used
+Here, results for 128-Bit and 64-Bit are exactly the same. Look [128-Bit](#128bit-enabled-fp64_mul) and [64-Bit](#default-fp64_mul) to see the difference (or lack of) in instructions used
 
 ![Multiplication -128Bit, Small-.png](media/Multiplication_-128Bit,_Small-.png)
 > Log values scale
@@ -190,7 +210,7 @@ I think that for smaller values it's sensible to use the `ExpFast`, while it mig
 
 Here we can again see the wavy pattern, but the overall precision of the Fast version is pretty good.
 I'd even say it's just enough for what's required, as we only deal with rather small input values of sqrt, where the precision is even better.
-This function is called every `irq`, so keeping it fast is crucial. This amount of precision is acceptable for out purpose.
+This function is called every `irq`, so keeping it fast is crucial. This amount of precision is acceptable for our purpose.
 
 ### Pow
 
@@ -200,7 +220,7 @@ This function is called every `irq`, so keeping it fast is crucial. This amount 
 
 ![Power_-Precise,_Small-.png](media/Power_-Precise,_Small-.png)
 ![Power_-Fast,_Small-.png](media/Power_-Fast,_Small-.png)  
-But as you can see. The absolute error for relatively small values is also relatively small, not matter the version (`Fast` or `Precise`).
+But as you can see. The absolute error for relatively small values is also relatively small, no matter the version (`Fast` or `Precise`).
 
 **Big**
 
@@ -209,8 +229,8 @@ But as you can see. The absolute error for relatively small values is also relat
 ![Power_-Precise,_Big-.png](media/Power_-Precise,_Big-.png)
 ![Power_-Fast,_Big-.png](media/Power_-Fast,_Big-.png)
 
-For this test (like for many) others it would be nice to have a relative error, but I decided to keep everything the same, so not to introduce any unnecessary confusion.  
-I think it is pretty safe to say that the resolution if the `Fast` version is enough.
+For this test (like for many others) it would be nice to have a relative error, but I decided to keep everything the same, so not to introduce any unnecessary confusion.  
+I think it is pretty safe to say that the precision of the `Fast` version is enough.
 
 ### Log
 > Log Y scale
