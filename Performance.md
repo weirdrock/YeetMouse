@@ -17,6 +17,7 @@
     * [Square Root](#square-root)
     * [Pow](#pow)
     * [Log](#log)
+* [Real-Life Performance Gains](#real-life-performance-gains)
 <!-- TOC -->
 
 # Why even use Fixed-Point arithmetic?
@@ -131,8 +132,8 @@ This simply uses `cqto` to enable octoword. It's still not the fastest, but it's
 	jne	.L4
 ```
 
-| Mop/s      | ns/op    | Clock cycles/op |
-|:----------:|:----------:|:---------------:|
+|   Mop/s    |  ns/op   | Clock cycles/op |
+|:----------:|:--------:|:---------------:|
 | 394.653702 | 2.585000 |    9.514920     |
 
 
@@ -153,9 +154,9 @@ What's a bit surprising here is that there is no call to `cqto` for example. Unl
 
 In the end it does the same thing as it's 64bit counterpart, just with fewer instructions.
 
-| Mop/s       | ns/op     | Clock cycles/op |
-|:----------:|:----------:|:---------------:|
-| 460.711727  |  2.223000 |    8.158278     |
+|   Mop/s    |  ns/op   | Clock cycles/op |
+|:----------:|:--------:|:---------------:|
+| 460.711727 | 2.223000 |    8.158278     |
 
 
 
@@ -173,7 +174,7 @@ Here, results for 128-Bit and 64-Bit are exactly the same. Look [128-Bit](#128bi
 > Log values scale
 
 ![Multiplication -128Bit, Big-.png](media/Multiplication_-128Bit,_Big-.png)  
-**White on this graph represents 0*
+**White on this graph represents 0, and yellow parts are simply caused by an overflow (>2³¹)*
 
 To no one's surprise error here is negligible.
 
@@ -240,4 +241,22 @@ I think it is pretty safe to say that the precision of the `Fast` version is eno
 
 The precision of both `Fast`, and `Precise` functions is very good. Thus, I will stick with the `Fast` version.
 
-*If you wouldn't read the text this page would look like a failed modern art project...*
+
+# Real-Life Performance Gains
+All the above comes down to this:
+
+|                        | Fixed Precise | Floating (float) | Fixed Fast* |
+|:----------------------:|:-------------:|:----------------:|:-----------:|
+| **Avg. IRQ time [ns]** |   346.7052    |     343.2419     |  207.5821   |
+
+*(The tests were conducted using `Jump` with smoothing on, as it's the most calculation heavy setting)*
+
+I'm quite happy with this performance, as the `Precise` version is surely much more precise than `float`, and the `Fast` version
+is precise enough not to notice a difference while giving a significant performance boost (*about 1.5x in most cases*).  
+By default the program will now run at the `Fixed Fast` setting.
+
+**"Fixed Fast" is one level faster than the most precise version, so if a function has a `Precise` version like `FP64_SqrtPrecise()`, then 
+`FP64_Sqrt()` is used as the `Fast` version.*
+
+
+*If you would only look at the images, this page would look like a failed modern art project...*

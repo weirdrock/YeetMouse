@@ -104,21 +104,20 @@ const FP_LONG fp64_100     = 100ll << FP64_Shift;
 const FP_LONG fp64_1000    = 1000ll << FP64_Shift;
 const FP_LONG fp64_10000    = 10000ll << FP64_Shift;
 
-// ########## Acceleration code
-
 // Acceleration happens here
 int accelerate(int *x, int *y, int *wheel)
 {
     FP_LONG delta_x, delta_y, delta_whl, ms, speed;
-    static long buffer_x = 0;
-    static long buffer_y = 0;
+    //static long buffer_x = 0;
+    //static long buffer_y = 0;
     static long buffer_whl = 0;
     //Static float assignment should happen at compile-time and thus should be safe here. However, avoid non-static assignment of floats outside kernel_fpu_begin()/kernel_fpu_end()
     static FP_LONG carry_x = 0;
     static FP_LONG carry_y = 0;
     static FP_LONG carry_whl = 0;
     static FP_LONG last_ms = One;
-    static ktime_t last;
+    //static long long iter = 0;
+    static ktime_t last;//, elapsed_time;
     ktime_t now;
     int status = 0;
 
@@ -130,8 +129,8 @@ int accelerate(int *x, int *y, int *wheel)
     //delta_whl = FP64_FromInt(*wheel);
 
     //Add buffer values, if present, and reset buffer
-    delta_x = FP64_Add(delta_x, FP64_FromInt((int) buffer_x)); buffer_x = 0;
-    delta_y = FP64_Add(delta_y, FP64_FromInt((int) buffer_y)); buffer_y = 0;
+    //delta_x = FP64_Add(delta_x, FP64_FromInt((int) buffer_x)); buffer_x = 0;
+    //delta_y = FP64_Add(delta_y, FP64_FromInt((int) buffer_y)); buffer_y = 0;
 
     //Calculate frametime
     now = ktime_get();
@@ -151,7 +150,7 @@ int accelerate(int *x, int *y, int *wheel)
     // Editor node: I have no idea, what this line above really does, but commenting it out solves all my problems
     // with incorrect data. Its seems to that it tries to fix a problem that doesnt exist, or doesnt exist on my
     // specific setup (PC / System / Mice)
-    if(dt >= fp64_1000) ms = fp64_1000;
+    if(dt >= fp64_100) ms = fp64_100;
 
     //if(ms > 100) ms = 100;      //Original InterAccel has 200 here. RawAccel rounds to 100. So do we.
     last_ms = ms;
@@ -160,7 +159,7 @@ int accelerate(int *x, int *y, int *wheel)
     update_params(now);
 
     //Calculate velocity (one step before rate, which divides rate by the last frametime)
-    speed = FP64_SqrtPrecise(FP64_Add(FP64_Mul(delta_x, delta_x), FP64_Mul(delta_y, delta_y)));
+    speed = FP64_Sqrt(FP64_Add(FP64_Mul(delta_x, delta_x), FP64_Mul(delta_y, delta_y)));
 
     //Apply speedcap
     if(g_InputCap > 0){
@@ -175,7 +174,7 @@ int accelerate(int *x, int *y, int *wheel)
     speed = FP64_Sub(speed, g_Offset);
 
     // Apply acceleration if movement is over offset
-    if(FP64_Sign(speed) > 0)
+    if(speed > 0)
     {
         // Linear acceleration
         if(g_AccelerationMode == 1) {
@@ -189,15 +188,15 @@ int accelerate(int *x, int *y, int *wheel)
         }
 
         // Power acceleration
-        if(g_AccelerationMode == 2) {
+        else if(g_AccelerationMode == 2) {
             // (Speed * Acceleration)^Exponent
 
             speed = FP64_Mul(speed, g_Acceleration);
-            speed = FP64_Pow(speed, g_Exponent);
+            speed = FP64_PowFast(speed, g_Exponent);
         }
 
         // Classic acceleration
-        if(g_AccelerationMode == 3) {
+        else if(g_AccelerationMode == 3) {
             // (Speed * Acceleration) ^ (Exponent - 1) + 1
             // Same as above just without adding the one
             //speed *= g_Acceleration;
@@ -206,12 +205,12 @@ int accelerate(int *x, int *y, int *wheel)
 
             // FIXED-POINT:
             speed = FP64_Mul(speed, g_Acceleration);
-            speed = FP64_Pow(speed, modesConst.exp_sub_1);
+            speed = FP64_PowFast(speed, modesConst.exp_sub_1);
             speed = FP64_Add(speed, fp64_1);
         }
 
         // Motivity (Sigmoid function)
-        if(g_AccelerationMode == 4) {
+        else if(g_AccelerationMode == 4) {
             // Acceleration / ( 1 + e ^ (midpoint - x))
             //product = g_Midpoint-speed;
             //motivity = e;
@@ -220,20 +219,20 @@ int accelerate(int *x, int *y, int *wheel)
             //speed = motivity;
 
             // FIXED-POINT:
-            FP_LONG exp = FP64_Exp(FP64_Sub(g_Midpoint, speed));
+            FP_LONG exp = FP64_ExpFast(FP64_Sub(g_Midpoint, speed));
             speed = FP64_Add(fp64_1, FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(fp64_1, exp)));
         }
 
         // Jump / Smooth Jump
-        if(g_AccelerationMode == 5) {
+        else if(g_AccelerationMode == 5) {
             // r = 2pi/(k*midpoint), where k is the smoothness factor (stored inside g_Exponent)
             // Jump: Acceleration / (1 + exp(r(midpoint - x))) + 1
             // Smooth: Integral of the above divided by x pretty much
 
-            FP_LONG D = FP64_Exp(FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed)));
+            FP_LONG D = FP64_ExpFast(FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed)));
 
             if(g_UseSmoothing) { // smooth
-                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(FP64_Log(FP64_Add(fp64_1, D)), modesConst.r)));
+                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(FP64_LogFast(FP64_Add(fp64_1, D)), modesConst.r)));
                 // Not really an integral
                 speed = FP64_Add(FP64_DivPrecise(FP64_Sub(integral, modesConst.C0), speed), fp64_1);
             }
@@ -247,7 +246,8 @@ int accelerate(int *x, int *y, int *wheel)
 
     // Actually apply accelerated sensitivity, allow post-scaling and apply carry from previous round
     // Like RawAccel, sensitivity will be a final multiplier:
-    speed = FP64_Mul(speed, g_Sensitivity);
+    if(g_Sensitivity != fp64_1)
+        speed = FP64_Mul(speed, g_Sensitivity);
 
     // Apply Output Limit
     if(g_OutputCap > 0)
@@ -278,10 +278,14 @@ int accelerate(int *x, int *y, int *wheel)
     carry_x = FP64_Sub(delta_x, FP64_FromInt(*x));
     carry_y = FP64_Sub(delta_y, FP64_FromInt(*y));
     //carry_whl = delta_whl - *wheel;
-    
-exit:
-//We stopped using the FPU: Switch back context again
-//kernel_fpu_end();
+
+    // Used to very roughly estimate the performance
+    //elapsed_time += ktime_sub(ktime_get(), now);
+    //if(iter++ == 1000) {
+    //    iter = 0;
+    //    pr_info("Leetmouse: Averaged at %lldns during 1000 iters\n", ktime_to_ns(elapsed_time));
+    //    elapsed_time = 0;
+    //}
 
     return status;
 }

@@ -240,6 +240,9 @@ static FP_LONG FP64_Sub(FP_LONG a, FP_LONG b) {
 /// Multiplies two FP values together.
 /// </summary>
 static FP_LONG FP64_Mul(FP_LONG a, FP_LONG b) {
+#ifdef __SIZEOF_INT128__
+    return (FP_LONG)(((__int128_t)a * (__int128_t)b) >> FP64_Shift);
+#endif
     FP_LONG ai = a >> FP64_Shift;
     FP_LONG af = (a & FractionMask);
     FP_LONG bi = b >> FP64_Shift;
@@ -299,10 +302,25 @@ static FP_INT FP64_Nlz(FP_ULONG x) {
 #endif
 }
 
+// Divides a 128 bit int (u1:u0) by a 64 bit int (v)
+static FP_LONG Div128_64(FP_LONG u1, FP_LONG u0, FP_LONG v) {
+    FP_LONG result;
+    uint64_t remainder;
+    __asm__ (
+            //"cqto\n\t"
+            "idivq %[v]" : "=a"(result), "=d"(remainder) : [v] "r"(v), "a"(u0), "d"(u1)
+    );
+    return result;
+}
+
 /// <summary>
 /// Divides two FP values.
 /// </summary>
 static FP_LONG FP64_DivPrecise(FP_LONG arg_a, FP_LONG arg_b) {
+#ifdef __SIZEOF_INT128__
+    return Div128_64(arg_a >> FP64_Shift, arg_a << FP64_Shift, arg_b);
+    //return (FP_LONG)(((__int128)arg_a << FP64_Shift) / (__int128)arg_b);
+#endif
     // From http://www.hackersdelight.org/hdcodetxt/divlu.c.txt
 
     FP_LONG sign_dif = arg_a ^ arg_b;
@@ -365,6 +383,11 @@ static FP_LONG FP64_DivPrecise(FP_LONG arg_a, FP_LONG arg_b) {
 /// Calculates division approximation.
 /// </summary>
 static FP_LONG FP64_Div(FP_LONG a, FP_LONG b) {
+#ifdef __SIZEOF_INT128__ // Same as precise, because it's fast and precise
+    /// This instruction might not work, because you cannot link C library when compiling for kernel, and
+    /// this uses __idiv3 instruction
+    return (FP_LONG)(((__int128)a << FP64_Shift) / (__int128)b);
+#endif
     if (b == MinValue || b == 0) {
         InvalidArgument("Fixed64::Div", "b", b);
         return 0;

@@ -139,8 +139,7 @@ int OnGui() {
         auto avail = ImGui::GetContentRegionAvail();
         ImGui::PopStyleColor();
         ImGui::PushItemWidth(avail.x);
-        ImGui::DragFloat("##MouseSmoothness", &mouse_smooth, 0.01, 0.0, 0.99, "Mouse Smoothness %0.2f");
-        //ImGui::DragFloat("##MouseSmoothness2", &mouse_smooth, 0.01, 0.0, 1, "Mouse Smoothness %0.2f");
+        ImGui::DragFloat("##MouseSmoothness", &mouse_smooth, 0.001, 0.0, 0.99, "Mouse Smoothness %0.2f");
         ImGui::PopItemWidth();
     }
     else
