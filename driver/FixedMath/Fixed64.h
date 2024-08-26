@@ -272,6 +272,7 @@ static FP_LONG FP64_Lerp(FP_LONG a, FP_LONG b, FP_LONG t) {
 }
 
 static FP_INT FP64_Nlz(FP_ULONG x) {
+    return __builtin_clzll(x); // Use the gcc built-in, it's much faster
 #if NET5_0_OR_GREATER
     return System.Numerics.BitOperations.LeadingZeroCount(x);
 #else
@@ -1319,7 +1320,7 @@ static FP_LONG FP64_AtanFastest(FP_LONG x) {
 }
 
 static const uint64_t FP_64_scales[10] = {
-        /* 18 decimals is enough for full fix64_t precision */
+        /* 18 decimals is enough for full 64bit fixed point precision */
         1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
 };
 

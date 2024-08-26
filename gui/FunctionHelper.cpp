@@ -1,7 +1,3 @@
-//
-// Created by not-a-dev on 8/17/24.
-//
-
 #include <cmath>
 
 #define M_PI 3.14159265358979323846f

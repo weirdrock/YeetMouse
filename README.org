@@ -201,10 +201,10 @@
 **** /More in-depth performance and precision analysis can be found [[Performance.md][here]]/.
 
 * TODOS
-  | Optimize some Fixed-Point functions                                | Shouldn't be a huge problem                                        |
   | AUR package release                                                | Once it reaches version 1.0 (basically after Im happy with it)     |
   | dpkg package for Debian based systems                              | After AUR release                                                  |
   | Feature parity with Povohats driver and later even RawAccel        | When I find time - Definitely after above milestones               |
+  | Optimize some Fixed-Point functions                                | Done                                                               |
   | GUI to configure the acceleration parameters                       | Done                                                               |
   | Move to Fixed-Point arithmetic                                     | Done                                                               |
   | External interface for dynamically pushing acceleration parameters | Done                                                               |

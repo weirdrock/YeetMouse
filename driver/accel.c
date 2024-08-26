@@ -54,9 +54,6 @@ PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scrol
 // Second, to fight possible cheating. However, this can be OFC changed, since we are OSS...
 #define PARAM_UPDATE(param) (FP64_FromString(g_param_##param, &g_##param))
 
-//const char* debug_speed_file = "/home/not-a-dev/Desktop/Coding/MouseDriver/leetmouse-master/speed_data";
-//const char* debug_speed_file = "/home/not-a-dev/Desktop/Coding/MouseDriver/leetmouse-master/speed_data";
-
 // Aggregate values that don't change with speed to save on calculations done every irq
 struct ModesConstants {
     bool is_init;

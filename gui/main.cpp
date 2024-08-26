@@ -81,7 +81,7 @@ int OnGui() {
             }
             case 1: // Linear
             {
-                change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0.01, 2, "Acceleration %0.2f");
+                change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 0.001, 2, "Acceleration %0.3f", ImGuiSliderFlags_Logarithmic);
                 break;
             }
             case 2: // Power

@@ -247,7 +247,7 @@ All the above comes down to this:
 
 |                        | Fixed Precise | Floating (float) | Fixed Fast* |
 |:----------------------:|:-------------:|:----------------:|:-----------:|
-| **Avg. IRQ time [ns]** |   346.7052    |     343.2419     |  207.5821   |
+| **Avg. IRQ time [ns]** |   346.7052    |     343.2419     |  190.4042   |
 
 *(The tests were conducted using `Jump` with smoothing on, as it's the most calculation heavy setting)*
 
@@ -256,7 +256,7 @@ is precise enough not to notice a difference while giving a significant performa
 By default the program will now run at the `Fixed Fast` setting.
 
 **"Fixed Fast" is one level faster than the most precise version, so if a function has a `Precise` version like `FP64_SqrtPrecise()`, then 
-`FP64_Sqrt()` is used as the `Fast` version.*
+`FP64_Sqrt()` is used as the `Fast` version. It also implements all the optimizations I managed to come up with.*
 
 
 *If you would only look at the images, this page would look like a failed modern art project...*
