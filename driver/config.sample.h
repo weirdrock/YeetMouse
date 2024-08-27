@@ -19,12 +19,13 @@
 // There values are just here to allow you to comfortably start the GUI and change them to your preferences.
 #define SENSITIVITY FP64_ONE //0.85f
 #define ACCELERATION 644245120ll // 10737418240ll - 2.5f  // 644245120ll - 0.15f
-#define OUTPUT_CAP (0ll << FP64_SHIFT)
+#define OUTPUT_CAP 0
 #define OFFSET 0
 //#define POST_SCALE_X 0.4f
 //#define POST_SCALE_Y 0.4f
 #define INPUT_CAP 0
 #define MIDPOINT (6ll << FP64_SHIFT)
+#define PRESCALE FP64_ONE
 #define USE_SMOOTHING 1
 
 

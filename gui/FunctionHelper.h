@@ -17,6 +17,7 @@ public:
 
     float EvalFuncAt(float x)
     {
+        x *= params->preScale;
         if(params->inCap > 0) {
             x = fminf(x, params->inCap);
         }
@@ -65,7 +66,7 @@ public:
             }
         }
 
-        return (params->outCap > 0) ? fminf(val, params->outCap) : val;
+        return ((params->outCap > 0) ? fminf(val, params->outCap) : val) * params->sens;
     }
     void PreCacheFunc();
 

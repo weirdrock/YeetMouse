@@ -87,10 +87,11 @@ namespace DriverHelper {
                 }
                 else if (ll_pos != std::string::npos) { // Floating point represented as a long long
                     fixed_num++;
+                    size_t start_offset = bracket_pos == std::string::npos ? 0 : (bracket_pos + 1);
                     std::ofstream o(entry.path());
                     if(!o.is_open() || o.bad() || o.fail())
                         return false;
-                    std::string int_str = str.substr(0, ll_pos);
+                    std::string int_str = str.substr(start_offset, ll_pos - start_offset);
                     FP_LONG fp_val = std::stoll(int_str);
                     char buf[24];
                     FP64_ToString(fp_val, buf, 6);
@@ -142,12 +143,12 @@ namespace DriverHelper {
     }
 } // DriverHelper
 
-Parameters::Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent,
-                       float midpoint, float scrollAccel, int accelMode) : sens(sens), outCap(sensCap),
-                                                                           inCap(speedCap), offset(offset),
-                                                                           accel(accel), exponent(exponent),
-                                                                           midpoint(midpoint), scrollAccel(scrollAccel),
-                                                                           accelMode(accelMode) {}
+//Parameters::Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent,
+//                       float midpoint, float scrollAccel, int accelMode) : sens(sens), outCap(sensCap),
+//                                                                           inCap(speedCap), offset(offset),
+//                                                                           accel(accel), exponent(exponent),
+//                                                                           midpoint(midpoint), scrollAccel(scrollAccel),
+//                                                                           accelMode(accelMode) {}
 
 bool Parameters::SaveAll() {
     bool res = true;
@@ -159,6 +160,7 @@ bool Parameters::SaveAll() {
     res &= SetParameterTy("Acceleration", accel);
     res &= SetParameterTy("Exponent", exponent);
     res &= SetParameterTy("Midpoint", midpoint);
+    res &= SetParameterTy("PreScale", preScale);
     res &= SetParameterTy("AccelerationMode", accelMode);
     res &= SetParameterTy("UseSmoothing", useSmoothing);
     DriverHelper::SaveParameters();

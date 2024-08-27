@@ -69,6 +69,8 @@ int OnGui() {
         change |= ImGui::DragFloat("##OutCap_Param", &params[selected_mode].outCap, 0.05, 0, 100, "Output Cap. %0.2f");
         change |= ImGui::DragFloat("##InCap_Param", &params[selected_mode].inCap, 0.1, 0, 200, "Input Cap. %0.2f");
         change |= ImGui::DragFloat("##Offset_Param", &params[selected_mode].offset, 0.05, -50, 50, "Offset %0.2f");
+        change |= ImGui::DragFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 0.01, 10, "Pre-Scale %0.2f");
+        ImGui::SetItemTooltip("Used to adjust for DPI (Should be 800/DPI)");
 
         ImGui::SeparatorText("Advanced");
 
@@ -159,7 +161,10 @@ int OnGui() {
         auto mouse_delta = ImGui::GetIO().MouseDelta;
         float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
         float avg_speed = fmaxf(mouse_speed * (1 - mouse_smooth) + last_frame_speed * mouse_smooth, 0.01);
-        ImPlotPoint mousePoint_main = ImPlotPoint(avg_speed, avg_speed < params[selected_mode].offset ? 1 : functions[selected_mode].EvalFuncAt(avg_speed - params[selected_mode].offset));
+        ImPlotPoint mousePoint_main = ImPlotPoint(avg_speed, avg_speed < params[selected_mode].offset ?
+            params[selected_mode].sens :
+            functions[selected_mode].EvalFuncAt(avg_speed - params[selected_mode].offset));
+
         last_frame_speed = avg_speed;
 
         // Display currently applied parameters in the background
@@ -290,6 +295,7 @@ int main() {
         DriverHelper::GetParameterF("Acceleration", start_params.accel);
         DriverHelper::GetParameterF("Exponent", start_params.exponent);
         DriverHelper::GetParameterF("Midpoint", start_params.midpoint);
+        DriverHelper::GetParameterF("PreScale", start_params.preScale);
         DriverHelper::GetParameterI("AccelerationMode", start_params.accelMode);
         DriverHelper::GetParameterB("UseSmoothing", start_params.useSmoothing);
 

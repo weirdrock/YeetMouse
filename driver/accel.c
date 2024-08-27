@@ -45,7 +45,8 @@ PARAM_F(OutputCap,      OUTPUT_CAP,         "Cap maximum sensitivity.");
 PARAM_F(Offset,         OFFSET,             "Mouse base sensitivity.");
 PARAM_F(Exponent,       EXPONENT,           "Exponent for algorithms that use it");
 PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function");
-PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (doesn't apply to all)")
+PARAM_F(PreScale,       PRESCALE,           "Parameter to adjust for the DPI");
+PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (doesn't apply to all)");
 PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
 
 
@@ -90,6 +91,7 @@ INLINE void update_params(ktime_t now)
     PARAM_UPDATE(ScrollsPerTick);
     PARAM_UPDATE(Exponent);
     PARAM_UPDATE(Midpoint);
+    PARAM_UPDATE(PreScale);
 
     update_constants();
 }
@@ -157,6 +159,10 @@ int accelerate(int *x, int *y, int *wheel)
 
     //Calculate velocity (one step before rate, which divides rate by the last frametime)
     speed = FP64_Sqrt(FP64_Add(FP64_Mul(delta_x, delta_x), FP64_Mul(delta_y, delta_y)));
+
+    // Apply Pre-Scale
+    if(g_PreScale != fp64_1)
+        speed = FP64_Mul(speed, g_PreScale);
 
     //Apply speedcap
     if(g_InputCap > 0){

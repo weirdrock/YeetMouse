@@ -10,6 +10,24 @@
 ** Preparation & Configuration
    + Clone this repository, copy =driver/config.sample.h= to =/driver/config.h= and edit it in your favorite text editor. Change the defines at the top of config.h to match your desired acceleration settings. But keep in mind that, the values in the config.h have to be the long long representations of their Fixed-Point data (limitation of C compile time constants), so it might be better to just do everything from the GUI.
    + Make sure, you have the required toolchains (e.g. =base-devel= on Arch or =build-essentials= on Debian) installed as well as the =linux-headers= for your installed kernel.
+
+** Running the GUI
+*** Prerequisites:
+   + OpenGL (you most likely already have it)
+   + GLFW3, which can be installed via these commands:
+   #+begin_src sh
+    sudo apt-get install libglfw3
+    sudo apt-get install libglfw3-dev
+   #+end_src
+
+*** Building
+   To build, go to the gui directory =cd gui/= and run =make=
+
+*** Starting
+   Keep in mind that the program needs to be *run with sudo privileges*.
+   To run, simply use =sudo ./YeetMouseGui=
+
+
 ** Arch/Manjaro
    Since the maintainer of =LEETMOUSE= is an Arch and Manjaro user, a =PKGBUILD= has been written for seamless integration into pacman.
 
@@ -41,12 +59,14 @@
    sudo make setup_dkms && sudo make udev_install
    sudo dkms install -m leetmouse-driver -v 0.9.0 # Enter the version you determined from the Makefile earlier in here
    #+end_src
+   (Or you can use the built-in install script like so: =sudo ./install.sh=).
+
    All your mice should now be bound to this driver. They will also automatically bind to it after a reboot. If this did not work, run =sudo /usr/lib/udev/leetmouse_manage bind_all=
    If this still does not work, there is a major problem
    
    *Uninstallation*
    
-   You again need to know then =version= as described above for the installation
+   You again need to know the =version= as described above for the installation
    #+begin_src sh
    # Unbind all mice from the driver
    sudo /usr/lib/udev/leetmouse_manage unbind_all
@@ -54,6 +74,8 @@
    sudo dkms remove -m leetmouse-driver -v 0.9.0
    sudo make remove_dkms && sudo make udev_uninstall
    #+end_src
+   (Or you can use the built-in uninstall script like so: =sudo ./uninstall.sh=).
+
    Unplug and replug your mouse or reboot to have your mice bound back to the generic usbhid.
 * Manual compile, insmod, bind
    If you want to compile this module only for testing purposes or development, you do not need to install the whole package to your system

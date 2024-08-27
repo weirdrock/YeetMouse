@@ -28,14 +28,15 @@ struct Parameters {
     float accel = 2.0f;
     float exponent = 0.4f;
     float midpoint = 5.0f;
+    float preScale = 1.0f;
     float scrollAccel = 1.0f;
     int accelMode = 0;
     bool useSmoothing = true; // true/false
 
     Parameters() = default;
 
-    Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent, float midpoint,
-               float scrollAccel, int accelMode);
+    //Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent, float midpoint,
+    //           float scrollAccel, int accelMode);
 
     bool SaveAll();
 };

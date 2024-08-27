@@ -1,7 +1,8 @@
 # Define the compiler and flags
 CXX = g++
-CXXFLAGS = -Wall -fsanitize=undefined -std=c++17 -O3 -I gui/External
+CXXFLAGS = -Wall -fsanitize=undefined -std=c++17 -O2 -flto -I gui/External
 LIBS = -lglfw3
+LDFLAGS = -flto
 
 # glfw3 and OpenGL are required to compile!
 
@@ -18,18 +19,9 @@ default: all
 
 all: $(TARGET)
 
-# Define the libfixmath library
-#LIBFIXMATH_DIR = ../libfixmath
-#LIBFIXMATH_SLIB = $(LIBFIXMATH_DIR)/libfixmath.a
-#LIBFIXMATH_SOURCES = $(wildcard $(LIBFIXMATH_DIR)/*.cpp)
-
 # Rule to build the target
 $(TARGET): $(OBJECTS) $(LIBFIXMATH_SLIB)
 	$(CXX) $(CXXFLAGS) -o $@ $(OBJECTS) -L$(LIBFIXMATH_DIR) -L/usr/lib/x86_64-linux-gnu -lGL $(LIBS)
-
-# Rule to build the libfixmath library
-#$(LIBFIXMATH_SLIB): $(LIBFIXMATH_SOURCES)
-#	$(MAKE) -C $(LIBFIXMATH_DIR)
 
 # Rule to build the object files
 %.o: %.cpp

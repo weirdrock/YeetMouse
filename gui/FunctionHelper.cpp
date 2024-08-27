@@ -55,8 +55,6 @@ void CachedFunction::PreCacheFunc() {
         }
         float val = EvalFuncAt(x);
         values[i] = val; // fabsf(params->outCap) > 0.01 ? fminf(val, params->outCap) : val;
-
-        values[i] *= params->sens;
         x += x_stride;
     }
 }
