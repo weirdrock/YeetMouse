@@ -5,33 +5,46 @@
 #include <filesystem>
 #include <iostream>
 #include <cstring>
+#include <sstream>
 
 #define LEETMOUSE_PARAMS_DIR "/sys/module/leetmouse/parameters/"
 
 template<typename Ty>
 bool GetParameterTy(const std::string& param_name, Ty &value) {
-    using namespace std;
-    ifstream file(LEETMOUSE_PARAMS_DIR + param_name);
+    try {
+        using namespace std;
+        ifstream file(LEETMOUSE_PARAMS_DIR + param_name);
 
-    if(file.bad())
+        if(file.bad())
+            return false;
+
+        file >> value;
+        file.close();
+        return true;
+    }
+    catch (std::exception& ex) {
+        fprintf(stderr, "Error when reading parameter %s (%s)\n", param_name.c_str(), ex.what());
         return false;
-
-    file >> value;
-    file.close();
-    return true;
+    }
 }
 
 template<typename Ty>
 bool SetParameterTy(const std::string& param_name, Ty value) {
-    using namespace std;
-    ofstream file(LEETMOUSE_PARAMS_DIR + param_name);
+    try {
+        using namespace std;
+        ofstream file(LEETMOUSE_PARAMS_DIR + param_name);
 
-    if(file.bad())
+        if (file.bad())
+            return false;
+
+        file << value;
+        file.close();
+        return true;
+    }
+    catch (std::exception& ex) {
+        fprintf(stderr, "Error when saving parameter %s (%s)\n", param_name.c_str(), ex.what());
         return false;
-
-    file << value;
-    file.close();
-    return true;
+    }
 }
 
 namespace DriverHelper {
@@ -49,6 +62,10 @@ namespace DriverHelper {
         bool res = GetParameterTy(param_name, temp);
         value = temp == 1;
         return res;
+    }
+
+    bool GetParameterS(const std::string &param_name, std::string &value) {
+        return GetParameterTy(param_name, value);
     }
 
     bool CleanParameters(int& fixed_num) {
@@ -141,6 +158,57 @@ namespace DriverHelper {
 
         return true;
     }
+
+    size_t ParseUserLutData(char *szUser_data, double* out, size_t out_size) {
+        std::stringstream ss(szUser_data);
+        size_t idx = 0;
+
+        double p = 0;
+        while(idx < out_size && ss >> p) {
+            out[idx++] = p;
+
+            char nextC = ss.peek();
+            if (nextC == ',' || nextC == ';')
+                ss.ignore();
+        }
+
+        // 1 element is not enough for a linear interpolation
+        if(idx <= 1) {
+            strcpy(szUser_data, "Not enough values or bad formatting\0");
+            return 0;
+        }
+
+        // Make sure all the data was parsed, if not then return 0
+        if(!ss.eof()) {
+            strcpy(szUser_data, "Too many samples\0");
+            sprintf(szUser_data, "Too many samples! (%zu max)", out_size);
+            fprintf(stderr, "Too many samples! (%zu max)\n", out_size);
+            return 0;
+        }
+
+        return idx;
+    }
+
+    size_t ParseDriverLutData(const char *szUser_data, double* out) {
+        std::stringstream ss(szUser_data);
+        size_t idx = 0;
+
+        double p = 0;
+        while(idx < MAX_LUT_ARRAY_SIZE && ss >> p) {
+            out[idx++] = p;
+
+            char nextC = ss.peek();
+            if (nextC == ';')
+                ss.ignore();
+        }
+
+        // 1 element is not enough for a linear interpolation
+        if(idx <= 1) {
+            return 0;
+        }
+
+        return idx;
+    }
 } // DriverHelper
 
 //Parameters::Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent,
@@ -150,19 +218,44 @@ namespace DriverHelper {
 //                                                                           midpoint(midpoint), scrollAccel(scrollAccel),
 //                                                                           accelMode(accelMode) {}
 
+std::string EncodeLutData(double* data, size_t size) {
+    std::string res;
+
+    for(int i = 0; i < size; i++) {
+        res += std::to_string(data[i]) + ";";
+    }
+
+    return res;
+}
+
 bool Parameters::SaveAll() {
     bool res = true;
 
+    // General
     res &= SetParameterTy("Sensitivity", sens);
     res &= SetParameterTy("OutputCap", outCap);
     res &= SetParameterTy("InputCap", inCap);
     res &= SetParameterTy("Offset", offset);
+    res &= SetParameterTy("AccelerationMode", accelMode);
+
+    // Specific
     res &= SetParameterTy("Acceleration", accel);
     res &= SetParameterTy("Exponent", exponent);
     res &= SetParameterTy("Midpoint", midpoint);
     res &= SetParameterTy("PreScale", preScale);
-    res &= SetParameterTy("AccelerationMode", accelMode);
     res &= SetParameterTy("UseSmoothing", useSmoothing);
+
+    // LUT
+    auto encodedLutData = EncodeLutData(LUT_data, LUT_size);
+    if(!encodedLutData.empty()) {
+        res &= SetParameterTy("LutSize", LUT_size);
+        res &= SetParameterTy("LutStride", LUT_stride);
+        //printf("encoded: %s, size: %zu, stride: %i\n", encoded.c_str(), LUT_size, LUT_stride);
+        res &= SetParameterTy("LutDataBuf", encodedLutData);
+    }
+    else
+        return false;
+
     DriverHelper::SaveParameters();
 
     return res;

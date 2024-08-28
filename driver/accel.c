@@ -14,13 +14,16 @@ MODULE_AUTHOR("Klaus Zipfel <klaus (at) zipfel (dot) family>");         //Curren
 MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Current maintainer
 // Sorry if you have issues with compilation because of this silly character in my family name lol <3
 
+#define MAX_LUT_ARRAY_SIZE 512
+#define MAX_LUT_BUF_LEN 4096
+
 //Converts a preprocessor define's value in "config.h" to a string - Suspect this to change in future version without a "config.h"
 #define _s(x) #x
 #define s(x) _s(x)
 
 //Convenient helper for float based parameters, which are passed via a string to this module (must be individually parsed via atof() - available in util.c)
 #define PARAM_F(param, default, desc)                           \
-    FP_LONG g_##param = (long long)default;                                  \
+    FP_LONG g_##param = (long long)default;                     \
     static char* g_param_##param = s(default);                  \
     module_param_named(param, g_param_##param, charp, 0644);    \
     MODULE_PARM_DESC(param, desc);
@@ -28,6 +31,17 @@ MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Curr
 #define PARAM(param, default, desc)                             \
     static char g_##param = default;                            \
     module_param_named(param, g_##param, byte, 0644);           \
+    MODULE_PARM_DESC(param, desc);
+
+#define PARAM_ARR(param, default, desc) \
+    static char g_param_##param[MAX_LUT_BUF_LEN] = s(default);                            \
+    module_param_string(param, g_param_##param, MAX_LUT_BUF_LEN, 0644);           \
+    MODULE_PARM_DESC(param, desc);
+
+#define PARAM_UL(param, default, desc)                           \
+    unsigned long g_##param = (unsigned long)default;                     \
+    static char* g_param_##param = s(default);                            \
+    module_param_named(param, g_##param, ulong, 0644);           \
     MODULE_PARM_DESC(param, desc);
 
 // ########## Kernel module parameters
@@ -43,34 +57,58 @@ PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity.");
 PARAM_F(Acceleration,   ACCELERATION,       "Mouse acceleration sensitivity.");
 PARAM_F(OutputCap,      OUTPUT_CAP,         "Cap maximum sensitivity.");
 PARAM_F(Offset,         OFFSET,             "Mouse base sensitivity.");
+
 PARAM_F(Exponent,       EXPONENT,           "Exponent for algorithms that use it");
 PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function");
 PARAM_F(PreScale,       PRESCALE,           "Parameter to adjust for the DPI");
 PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (doesn't apply to all)");
 PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
 
+PARAM_UL(LutSize,       LUT_SIZE,           "LUT data array size");
+PARAM_F(LutStride,      LUT_STRIDE,         "Distance between y values for the LUT");
+PARAM_ARR(LutDataBuf,   LUT_DATA,           "Data of the LUT stored in a human form"); // g_LutDataBuf should not be used!
+
+FP_LONG g_LutData[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
+
+// Converts given string to a unsigned long
+unsigned long atoul(const char *str) {
+    unsigned long result = 0;
+    int i = 0;
+
+    // Iterate through the string, converting each digit to an integer
+    while (str[i] >= '0' && str[i] <= '9') {
+        result = result * 10 + (str[i] - '0');
+        i++;
+    }
+
+    return result;
+}
 
 // Updates the acceleration parameters. This is purposely done with a delay!
 // First, to not hammer too much the logic in "accelerate()", which is called VERY OFTEN!
 // Second, to fight possible cheating. However, this can be OFC changed, since we are OSS...
 #define PARAM_UPDATE(param) (FP64_FromString(g_param_##param, &g_##param))
+#define PARAM_UPDATE_UL(param) (atoul(g_param_##param))
 
 // Aggregate values that don't change with speed to save on calculations done every irq
 struct ModesConstants {
     bool is_init;
+
     // Jump
     FP_LONG C0; // the "integral" evaluated at 0
     FP_LONG r; // basically a smoothness factor
 
     FP_LONG accel_sub_1;
     FP_LONG exp_sub_1;
-} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0 };
+} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, };
 
 // Recalculate new modes constants
 static void update_constants(void) {
+    // General
     modesConst.accel_sub_1 = FP64_Sub(g_Acceleration, FP64_ONE);
     modesConst.exp_sub_1 = FP64_Sub(g_Exponent, FP64_ONE);
 
+    // Jump
     modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
     modesConst.C0 = FP64_DivPrecise(FP64_Mul(modesConst.accel_sub_1, FP64_Log(FP64_Add(1, FP64_Exp(FP64_Mul(modesConst.r, g_Midpoint))))), modesConst.r);
 }
@@ -92,6 +130,27 @@ INLINE void update_params(ktime_t now)
     PARAM_UPDATE(Exponent);
     PARAM_UPDATE(Midpoint);
     PARAM_UPDATE(PreScale);
+    PARAM_UPDATE_UL(LutSize);
+    PARAM_UPDATE(LutStride);
+    if(g_LutSize > MAX_LUT_ARRAY_SIZE)
+        g_LutSize = MAX_LUT_ARRAY_SIZE;
+    // LutDataBuf get auto updated, we don't need to do anything, just extract the data
+    // Populate the g_LutData with the data in the buffer
+    char* p = g_param_LutDataBuf;
+    for(int i = 0; i < g_LutSize && *p; i++) {
+        FP_LONG val;
+        p += FP64_FromString(p, &val) + 1; // + 1 to skip the ';'
+        g_LutData[i] = val;
+
+        // Debug stuff (you know it didnt work the first time (nor the 10th time...))
+        //char buf[25];
+        //FP64_ToString(val, buf, 4);
+        //printk("LeetMouse: Converted %s, next char is: %i\n", buf, *p);
+    }
+
+    // Sanity check
+    if((g_LutSize <= 1 || g_LutStride == 0) && g_AccelerationMode == 6)
+        g_AccelerationMode = 1;
 
     update_constants();
 }
@@ -242,6 +301,23 @@ int accelerate(int *x, int *y, int *wheel)
             else {
                 speed = FP64_Add(FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(fp64_1, D)), fp64_1);
             }
+        }
+
+        else if(g_AccelerationMode == 6) {
+            // Assumes the size and values are valid. Please don't change LUT parameters by hand.
+
+            FP_LONG prec_pos = FP64_Mul(g_LutStride, speed);
+            int pos = min((int)FP64_FloorToInt(prec_pos), (int)g_LutSize - 2);
+            FP_LONG p = g_LutData[pos];
+            FP_LONG p1 = g_LutData[pos + 1];
+
+            FP_LONG frac = prec_pos - FP64_FromInt(pos);
+
+            speed = FP64_Lerp(p, p1, frac);
+        }
+
+        else {
+            speed = fp64_1;
         }
     }
     else

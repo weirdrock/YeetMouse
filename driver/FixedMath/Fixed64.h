@@ -268,7 +268,7 @@ static FP_LONG FP64_MulIntLongLong(FP_INT a, FP_LONG b) {
 /// Linearly interpolate from a to b by t.
 /// </summary>
 static FP_LONG FP64_Lerp(FP_LONG a, FP_LONG b, FP_LONG t) {
-    return FP64_Mul(a, t) + FP64_Mul(b, One - t);
+    return FP64_Mul(b - a, t) + a;
 }
 
 static FP_INT FP64_Nlz(FP_ULONG x) {
@@ -1373,7 +1373,9 @@ static void FP64_ToString(FP_LONG value, char *buf, int decimals) {
 #define isdigit(c) (c >= '0' && c <= '9')
 #define isspace(c) (c == ' ' || c == '\t' || c == '\n')
 
-static bool FP64_FromString(const char *buf, FP_LONG *val) {
+// Returns the number of converted bytes
+static int FP64_FromString(const char *buf, FP_LONG *val) {
+    const char* start_pos = buf;
     while (isspace(*buf))
         buf++;
 
@@ -1412,15 +1414,15 @@ static bool FP64_FromString(const char *buf, FP_LONG *val) {
     }
 
     /* Verify that there is no garbage left over */
-    while (*buf != '\0') {
+    while (*buf != '\0' && *buf != ';') {
         if (!isdigit((unsigned char) *buf) && !isspace((unsigned char) *buf))
-            return false;
+            return 0;
 
         buf++;
     }
 
     *val = negative ? -value : value;
-    return true;
+    return buf - start_pos;
 }
 
 

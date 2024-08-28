@@ -28,6 +28,11 @@
 #define PRESCALE FP64_ONE
 #define USE_SMOOTHING 1
 
+// LUT settings
+#define LUT_SIZE 0
+#define LUT_STRIDE FP64_ONE
+#define LUT_DATA 0
+
 
 #define ACCELERATION_MODE 1
 

@@ -9,7 +9,7 @@
 
 int selected_mode = 1;
 
-const char* AccelModes[] = {"Current", "Linear", "Power", "Classic", "Motivity", "Jump"};
+const char* AccelModes[] = {"Current", "Linear", "Power", "Classic", "Motivity", "Jump", "Look Up Table"};
 #define NUM_MODES (sizeof(AccelModes) / sizeof(char *))
 
 Parameters params[NUM_MODES]; // Driver parameters for each mode
@@ -111,6 +111,26 @@ int OnGui() {
                 change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 0.01, 1, "Smoothness %0.2f");
                 change |= ImGui::Checkbox("##Smoothing_Param", &params[selected_mode].useSmoothing);
                 ImGui::SameLine(); ImGui::Text("Use Smoothing");
+                break;
+            }
+            case 6: {
+                static char LUT_user_data[4096];
+                ImGui::Text("LUT data:");
+                change |= ImGui::InputTextWithHint("##LUT data", "y1,y2,y3...", LUT_user_data, sizeof(LUT_user_data));
+                ImGui::SetItemTooltip("Format: y1,y2,y3... (There are no 'x' values!)");
+                change |= ImGui::DragFloat("##LUT_Stride_Param", &params[selected_mode].LUT_stride, 0.05, 0.05, 10, "Stride %0.2f");
+                ImGui::SetItemTooltip("Gap between each 'y' value");
+                if(ImGui::Button("Save", {-1, 0}))
+                {
+                    change |= true;
+
+                    // Needs to be converted to int, because the kernel parameters don't deal too well with unsigned long longs
+                    params[selected_mode].LUT_size = DriverHelper::ParseUserLutData(LUT_user_data,
+                                                                                    params[selected_mode].LUT_data,
+                                                                                    sizeof(params[selected_mode].LUT_data) /
+                                                                                    sizeof(params[selected_mode].LUT_data[0]));
+                }
+                break;
             }
             default:
             {
@@ -207,7 +227,9 @@ int OnGui() {
         ImGui::SameLine();
 
         // Disable Apply button for 1.1 second after clicking it (this is a driver "limitation")
-        ImGui::BeginDisabled(!has_privilege || !was_initialized || duration_cast<milliseconds>(steady_clock::now() - last_apply_clicked).count() < 1100);
+        ImGui::BeginDisabled(!has_privilege || !was_initialized ||
+                            duration_cast<milliseconds>(steady_clock::now() - last_apply_clicked).count() < 1100 ||
+                            (selected_mode == 6 /* LUT */ && params[selected_mode].LUT_size == 0)    );
 
         if (ImGui::Button("Apply", {-1, -1})) {
             params[selected_mode].SaveAll();
@@ -245,6 +267,9 @@ void ResetParameters(void) {
     for(int mode = 0; mode < NUM_MODES; mode++) {
         params[mode] = start_params;
         params[mode].accelMode = mode == 0 ? used_mode : mode;
+
+        if(mode == 6)
+            memcpy(params[mode].LUT_data, start_params.LUT_data, start_params.LUT_size * sizeof(params[selected_mode].LUT_data[0]));
 
         if(mode == 3)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 5), 2.1);
@@ -298,6 +323,11 @@ int main() {
         DriverHelper::GetParameterF("PreScale", start_params.preScale);
         DriverHelper::GetParameterI("AccelerationMode", start_params.accelMode);
         DriverHelper::GetParameterB("UseSmoothing", start_params.useSmoothing);
+        DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
+        DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
+        std::string Lut_dataBuf;
+        DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);
+        DriverHelper::ParseDriverLutData(Lut_dataBuf.c_str(), start_params.LUT_data);
 
         used_mode = start_params.accelMode;
 
