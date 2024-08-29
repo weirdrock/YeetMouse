@@ -14,7 +14,7 @@ MODULE_AUTHOR("Klaus Zipfel <klaus (at) zipfel (dot) family>");         //Curren
 MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Current maintainer
 // Sorry if you have issues with compilation because of this silly character in my family name lol <3
 
-#define MAX_LUT_ARRAY_SIZE 512
+#define MAX_LUT_ARRAY_SIZE 128
 #define MAX_LUT_BUF_LEN 4096
 
 //Converts a preprocessor define's value in "config.h" to a string - Suspect this to change in future version without a "config.h"
@@ -65,10 +65,11 @@ PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (do
 PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
 
 PARAM_UL(LutSize,       LUT_SIZE,           "LUT data array size");
-PARAM_F(LutStride,      LUT_STRIDE,         "Distance between y values for the LUT");
+//PARAM_F(LutStride,      LUT_STRIDE,         "Distance between y values for the LUT");
 PARAM_ARR(LutDataBuf,   LUT_DATA,           "Data of the LUT stored in a human form"); // g_LutDataBuf should not be used!
 
-FP_LONG g_LutData[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
+FP_LONG g_LutData_x[MAX_LUT_ARRAY_SIZE]; // Array to store the x-values of the LUT data
+FP_LONG g_LutData_y[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
 
 // Converts given string to a unsigned long
 unsigned long atoul(const char *str) {
@@ -131,25 +132,31 @@ INLINE void update_params(ktime_t now)
     PARAM_UPDATE(Midpoint);
     PARAM_UPDATE(PreScale);
     PARAM_UPDATE_UL(LutSize);
-    PARAM_UPDATE(LutStride);
+    //PARAM_UPDATE(LutStride);
     if(g_LutSize > MAX_LUT_ARRAY_SIZE)
         g_LutSize = MAX_LUT_ARRAY_SIZE;
     // LutDataBuf get auto updated, we don't need to do anything, just extract the data
     // Populate the g_LutData with the data in the buffer
     char* p = g_param_LutDataBuf;
-    for(int i = 0; i < g_LutSize && *p; i++) {
+    int i = 0;
+    for(; i < g_LutSize*2 && *p; i++) {
         FP_LONG val;
         p += FP64_FromString(p, &val) + 1; // + 1 to skip the ';'
-        g_LutData[i] = val;
+        // The format for the driver side is very strict tho, so don't edit it by hand pls.
+        ((i % 2 == 0) ? g_LutData_x : g_LutData_y)[i/2] = val;
 
-        // Debug stuff (you know it didnt work the first time (nor the 10th time...))
+        // Debug stuff (you know it didn't work the first time (nor the 10th time... (that's at least 10 'blue screens')))
         //char buf[25];
         //FP64_ToString(val, buf, 4);
         //printk("LeetMouse: Converted %s, next char is: %i\n", buf, *p);
     }
 
+    // Did not work correctly
+    if(i % 2 == 1)
+        g_LutSize = 0;
+
     // Sanity check
-    if((g_LutSize <= 1 || g_LutStride == 0) && g_AccelerationMode == 6)
+    if((g_LutSize <= 1 /*|| g_LutStride == 0*/) && g_AccelerationMode == 6)
         g_AccelerationMode = 1;
 
     update_constants();
@@ -306,14 +313,29 @@ int accelerate(int *x, int *y, int *wheel)
         else if(g_AccelerationMode == 6) {
             // Assumes the size and values are valid. Please don't change LUT parameters by hand.
 
-            FP_LONG prec_pos = FP64_Mul(g_LutStride, speed);
-            int pos = min((int)FP64_FloorToInt(prec_pos), (int)g_LutSize - 2);
-            FP_LONG p = g_LutData[pos];
-            FP_LONG p1 = g_LutData[pos + 1];
+            if(speed < g_LutData_x[0]) // Check if the speed is below the first given point
+                speed = g_LutData_y[0];
+            else {
+                int l = 0, r = g_LutSize - 2;
+                while (l <= r) {
+                    int mid = (r + l) / 2;
 
-            FP_LONG frac = prec_pos - FP64_FromInt(pos);
+                    if (speed > g_LutData_x[mid]) {
+                        l = mid + 1;
+                    } else if (speed < g_LutData_x[mid])
+                        r = mid - 1;
+                    else { // Should never happen
+                        break;
+                    }
+                }
 
-            speed = FP64_Lerp(p, p1, frac);
+                FP_LONG p = g_LutData_y[r];
+                FP_LONG p1 = g_LutData_y[r + 1];
+
+                FP_LONG frac = FP64_DivPrecise(speed - g_LutData_x[r], g_LutData_x[r + 1] - g_LutData_x[r]);
+
+                speed = FP64_Lerp(p, p1, frac);
+            }
         }
 
         else {

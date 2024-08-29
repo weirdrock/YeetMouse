@@ -12,4 +12,6 @@ namespace GUI
     void SetWindowSize(int x, int y);
 
     inline GLFWwindow* window;
+
+    void GetMousePos(double *x, double *y);
 }

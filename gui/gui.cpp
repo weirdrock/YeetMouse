@@ -82,7 +82,7 @@ void SetupImGuiStyle()
     style.Colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.407843142747879f, 0.407843142747879f, 0.407843142747879f, 1.0f);
     style.Colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.5098039507865906f, 0.5098039507865906f, 0.5098039507865906f, 1.0f);
     style.Colors[ImGuiCol_CheckMark] = ImVec4(0.4274509847164154f, 0.6901960968971252f, 1.0f, 1.0f);
-    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.5098039507865906f, 0.5098039507865906f, 0.5098039507865906f, 1.0f);
+    style.Colors[ImGuiCol_SliderGrab] = ImVec4(0.4098039507865906f, 0.4098039507865906f, 0.4098039507865906f, 1.0f);
     style.Colors[ImGuiCol_SliderGrabActive] = ImVec4(0.4291845560073853f, 0.6899459362030029f, 1.0f, 1.0f);
     style.Colors[ImGuiCol_Button] = ImVec4(0.1671056598424911f, 0.516862154006958f, 0.9270386099815369f, 1.0f);
     style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.2588235437870026f, 0.5882353186607361f, 0.9764705896377563f, 1.0f);
@@ -173,6 +173,10 @@ int GUI::Setup(int (*OnGui)())
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    // Switch to raw input
+    //if (glfwRawMouseMotionSupported())
+    //    glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+
     auto& style = ImGui::GetStyle();
     style.SeparatorTextPadding.y = 6;
     style.SeparatorTextAlign = {0.5, 0.5};
@@ -195,6 +199,10 @@ int GUI::Setup(int (*OnGui)())
     io.Fonts->Build();
 
     return 0;
+}
+
+void GUI::GetMousePos(double *x, double *y) {
+    glfwGetCursorPos(window, x, y);
 }
 
 void GUI::ShutDown() {

@@ -3,7 +3,7 @@
 
 #include "string"
 
-#define MAX_LUT_ARRAY_SIZE 512  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
+#define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
 namespace DriverHelper {
     bool GetParameterF(const std::string& param_name, float& value);
@@ -22,10 +22,10 @@ namespace DriverHelper {
     bool CleanParameters(int& fixed_num);
 
     /// Returns the number of parsed values
-    size_t ParseUserLutData(char* user_data, double* out, size_t out_size);
+    size_t ParseUserLutData(char* user_data, double* out_x, double* out_y, size_t out_size);
 
     /// Returns the number of parsed values
-    size_t ParseDriverLutData(const char* user_data, double* out);
+    size_t ParseDriverLutData(const char* user_data, double* out_x, double* out_y);
 
 } // DriverHelper
 
@@ -44,8 +44,10 @@ struct Parameters {
 
     /// The issue of performance with LUT is currently solved with a fixed stride, but another approach would be to
     /// store separately x and y values, sort both by x values, and do a binary search every time you want to find points.
-    float LUT_stride = 1.f;
-    double LUT_data[MAX_LUT_ARRAY_SIZE];
+    /// ----- The so called "another approach" has been implemented -----
+    //float LUT_stride = 1.f; // No longer used
+    double LUT_data_x[MAX_LUT_ARRAY_SIZE];
+    double LUT_data_y[MAX_LUT_ARRAY_SIZE];
     int LUT_size = 0;
 
     Parameters() = default;

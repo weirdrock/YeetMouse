@@ -67,21 +67,36 @@ public:
                 if(params->LUT_size == 0)
                     break;
 
-                //if(x > (params->LUT_size - 1) / params->LUT_stride) { // Out of range
-                //    int end_idx = (params->LUT_size - 1);
-                //    float p1 = params->LUT_data[end_idx];
-                //    float p = params->LUT_data[end_idx - 1];
-                //    float slope = (p1 - p) / params->LUT_stride;
-                //
-                //    val = slope * (x - ((params->LUT_size - 0) / params->LUT_stride)) + p1 + slope;
-                //
-                //    break;
-                //}
-                int pos = std::min((int)(params->LUT_stride * x), (int)params->LUT_size - 2);
-                float p = params->LUT_data[(int)(pos)]; // p element
-                float p1 = params->LUT_data[(int)(pos) + 1]; // p + 1 element
+                if(x < params->LUT_data_x[0]) {
+                    val = params->LUT_data_y[0];
+                    break;
+                }
 
-                float frac = (params->LUT_stride * x) - pos;
+                // Binary Search for the closest value smaller than x, so the n+1 value is greater than x
+                int l = 0, r = params->LUT_size - 2;
+                while(l <= r) {
+                    int mid = (r + l) / 2;
+
+                    if(x > params->LUT_data_x[mid]) {
+                        l = mid + 1;
+                    }
+                    else if(x < params->LUT_data_x[mid]) {
+                        r = mid - 1;
+                    }
+                    else { // This should never happen
+                        break;
+                    }
+                }
+
+                l = r;
+                //printf("Found best x (for %f) idx: %i (%f), val: %f\n", x, l, params->LUT_data_x[l], params->LUT_data_y[l]);
+
+                int pos = l;//std::min(l, (int)params->LUT_size - 2);
+                float p = params->LUT_data_y[(int)(pos)]; // p element
+                float p1 = params->LUT_data_y[(int)(pos) + 1]; // p + 1 element
+
+                // derived from this (lerp): frac * params->LUT_data_x[l + 1] + params->LUT_data_x[l] = x
+                float frac = (x-params->LUT_data_x[l]) / (params->LUT_data_x[l + 1] - params->LUT_data_x[l]);
 
                 //printf("frac: %f\n", frac);
 

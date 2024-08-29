@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstring>
 #include <sstream>
+#include <algorithm>
 
 #define LEETMOUSE_PARAMS_DIR "/sys/module/leetmouse/parameters/"
 
@@ -159,43 +160,65 @@ namespace DriverHelper {
         return true;
     }
 
-    size_t ParseUserLutData(char *szUser_data, double* out, size_t out_size) {
+    size_t ParseUserLutData(char *szUser_data, double* out_x, double* out_y, size_t out_size) {
         std::stringstream ss(szUser_data);
         size_t idx = 0;
 
         double p = 0;
-        while(idx < out_size && ss >> p) {
-            out[idx++] = p;
+        while(idx < out_size * 2 && ss >> p) {
+            ((idx % 2 == 0) ? out_x : out_y)[idx++ / 2] = p;
 
+            int skipped = 0;
             char nextC = ss.peek();
-            if (nextC == ',' || nextC == ';')
+            while (nextC == ',' || nextC == ';' || (skipped > 0 && isspace(nextC))) {
                 ss.ignore();
+                nextC = ss.peek();
+                skipped++;
+            }
         }
 
+        //for(int i = 0; i < idx/2; i++) {
+        //    printf("%f, ", out_x[i]);
+        //}
+        //printf("\n");
+
         // 1 element is not enough for a linear interpolation
-        if(idx <= 1) {
+        if(idx <= 2 || idx % 2 == 1) {
             strcpy(szUser_data, "Not enough values or bad formatting\0");
             return 0;
         }
 
         // Make sure all the data was parsed, if not then return 0
         if(!ss.eof()) {
-            strcpy(szUser_data, "Too many samples\0");
             sprintf(szUser_data, "Too many samples! (%zu max)", out_size);
             fprintf(stderr, "Too many samples! (%zu max)\n", out_size);
             return 0;
         }
 
-        return idx;
+        // Zip the X and Y values for sorting
+        std::pair<double, double> pairs[MAX_LUT_ARRAY_SIZE];
+        for(int i = 0; i < idx/2; i++)
+            pairs[i] = std::make_pair(out_x[i], out_y[i]);
+
+        // Sort the values together (according to X). While preserving the ordering in case of equal X values
+        std::sort(pairs, pairs + idx/2, [](std::pair<double, double> a, std::pair<double, double> b) {return a.first < b.first;});
+
+        // Unzip
+        for(int i = 0; i < idx/2; i++) {
+            out_x[i] = pairs[i].first;
+            out_y[i] = pairs[i].second;
+        }
+
+        return idx / 2;
     }
 
-    size_t ParseDriverLutData(const char *szUser_data, double* out) {
+    size_t ParseDriverLutData(const char *szUser_data, double* out_x, double* out_y) {
         std::stringstream ss(szUser_data);
         size_t idx = 0;
 
         double p = 0;
         while(idx < MAX_LUT_ARRAY_SIZE && ss >> p) {
-            out[idx++] = p;
+            (idx % 2 == 0 ? out_x : out_y)[idx++/2] = p;
 
             char nextC = ss.peek();
             if (nextC == ';')
@@ -203,11 +226,11 @@ namespace DriverHelper {
         }
 
         // 1 element is not enough for a linear interpolation
-        if(idx <= 1) {
+        if(idx <= 2 || idx % 2 == 1) {
             return 0;
         }
 
-        return idx;
+        return idx / 2;
     }
 } // DriverHelper
 
@@ -218,11 +241,11 @@ namespace DriverHelper {
 //                                                                           midpoint(midpoint), scrollAccel(scrollAccel),
 //                                                                           accelMode(accelMode) {}
 
-std::string EncodeLutData(double* data, size_t size) {
+std::string EncodeLutData(double* data_x, double* data_y, size_t size) {
     std::string res;
 
-    for(int i = 0; i < size; i++) {
-        res += std::to_string(data[i]) + ";";
+    for(int i = 0; i < size * 2; i++) {
+        res += std::to_string(i % 2 == 0 ? data_x[i/2] : data_y[i/2]) + ";";
     }
 
     return res;
@@ -246,14 +269,14 @@ bool Parameters::SaveAll() {
     res &= SetParameterTy("UseSmoothing", useSmoothing);
 
     // LUT
-    auto encodedLutData = EncodeLutData(LUT_data, LUT_size);
+    auto encodedLutData = EncodeLutData(LUT_data_x, LUT_data_y, LUT_size);
     if(!encodedLutData.empty()) {
         res &= SetParameterTy("LutSize", LUT_size);
-        res &= SetParameterTy("LutStride", LUT_stride);
+        //res &= SetParameterTy("LutStride", LUT_stride);
         //printf("encoded: %s, size: %zu, stride: %i\n", encoded.c_str(), LUT_size, LUT_stride);
         res &= SetParameterTy("LutDataBuf", encodedLutData);
     }
-    else
+    else if(accelMode == 6)
         return false;
 
     DriverHelper::SaveParameters();

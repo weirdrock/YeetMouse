@@ -7,6 +7,8 @@
 #include "ImGuiExtensions.h"
 #include "chrono"
 
+//#define USE_INPUT_DRAG
+
 int selected_mode = 1;
 
 const char* AccelModes[] = {"Current", "Linear", "Power", "Classic", "Motivity", "Jump", "Look Up Table"};
@@ -65,11 +67,19 @@ int OnGui() {
         bool change = false;
 
         // Display Global Parameters First
+#ifdef USE_INPUT_DRAG
         change |= ImGui::DragFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 0.01, 10, "Sensitivity %0.2f");
         change |= ImGui::DragFloat("##OutCap_Param", &params[selected_mode].outCap, 0.05, 0, 100, "Output Cap. %0.2f");
         change |= ImGui::DragFloat("##InCap_Param", &params[selected_mode].inCap, 0.1, 0, 200, "Input Cap. %0.2f");
         change |= ImGui::DragFloat("##Offset_Param", &params[selected_mode].offset, 0.05, -50, 50, "Offset %0.2f");
         change |= ImGui::DragFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 0.01, 10, "Pre-Scale %0.2f");
+#else
+        change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 10, "Sensitivity %0.2f");
+        change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 100, "Output Cap. %0.2f");
+        change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
+        change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
+        change |= ImGui::SliderFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 10, "Pre-Scale %0.2f");
+#endif
         ImGui::SetItemTooltip("Used to adjust for DPI (Should be 800/DPI)");
 
         ImGui::SeparatorText("Advanced");
@@ -83,32 +93,57 @@ int OnGui() {
             }
             case 1: // Linear
             {
-                change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 0.001, 2, "Acceleration %0.3f", ImGuiSliderFlags_Logarithmic);
+#ifdef USE_INPUT_DRAG
+                change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.0001, 0.0005, 0.1, "Acceleration %0.4f", ImGuiSliderFlags_Logarithmic);
+#else
+                change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.0005, 0.1, "Acceleration %0.4f", ImGuiSliderFlags_Logarithmic);
+#endif
                 break;
             }
             case 2: // Power
             {
+#ifdef USE_INPUT_DRAG
                 change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0.01, 10, "Acceleration %0.2f");
                 change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 0.01, 1, "Exponent %0.2f");
+#else
+                change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 10, "Acceleration %0.2f");
+                change |= ImGui::SliderFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 1, "Exponent %0.2f");
+#endif
                 break;
             }
             case 3: // Classic
             {
+#ifdef USE_INPUT_DRAG
                 change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 0.001, 2, "Acceleration %0.3f");
                 change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 2.01, 5, "Exponent %0.2f");
+#else
+                change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 2, "Acceleration %0.3f");
+                change |= ImGui::SliderFloat("##Exp_Param", &params[selected_mode].exponent, 2.01, 5, "Exponent %0.2f");
+#endif
                 break;
             }
             case 4: // Motivity
             {
+#ifdef USE_INPUT_DRAG
                 change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0.01, 10, "Acceleration %0.2f");
                 change |= ImGui::DragFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.05, 0.1, 50, "Start %0.2f");
+#else
+                change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 10, "Acceleration %0.2f");
+                change |= ImGui::SliderFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.1, 50, "Start %0.2f");
+#endif
                 break;
             }
             case 5: // Jump
             {
+#ifdef USE_INPUT_DRAG
                 change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0, 10, "Acceleration %0.2f");
                 change |= ImGui::DragFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.05, 0.1, 50, "Start %0.2f");
                 change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 0.01, 1, "Smoothness %0.2f");
+#else
+                change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0, 10, "Acceleration %0.2f");
+                change |= ImGui::SliderFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.1, 50, "Start %0.2f");
+                change |= ImGui::SliderFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 1, "Smoothness %0.2f");
+#endif
                 change |= ImGui::Checkbox("##Smoothing_Param", &params[selected_mode].useSmoothing);
                 ImGui::SameLine(); ImGui::Text("Use Smoothing");
                 break;
@@ -116,19 +151,20 @@ int OnGui() {
             case 6: {
                 static char LUT_user_data[4096];
                 ImGui::Text("LUT data:");
-                change |= ImGui::InputTextWithHint("##LUT data", "y1,y2,y3...", LUT_user_data, sizeof(LUT_user_data));
-                ImGui::SetItemTooltip("Format: y1,y2,y3... (There are no 'x' values!)");
-                change |= ImGui::DragFloat("##LUT_Stride_Param", &params[selected_mode].LUT_stride, 0.05, 0.05, 10, "Stride %0.2f");
-                ImGui::SetItemTooltip("Gap between each 'y' value");
+                change |= ImGui::InputTextWithHint("##LUT data", "x1,y1;x2,y2;x3,y3...", LUT_user_data, sizeof(LUT_user_data), ImGuiInputTextFlags_AutoSelectAll);
+                ImGui::SetItemTooltip("Format: x1,y1;x2,y2;x3,y3... (commas and semicolons are treated equally)");
+                //change |= ImGui::DragFloat("##LUT_Stride_Param", &params[selected_mode].LUT_stride, 0.05, 0.05, 10, "Stride %0.2f");
+                //ImGui::SetItemTooltip("Gap between each 'y' value");
                 if(ImGui::Button("Save", {-1, 0}))
                 {
                     change |= true;
 
                     // Needs to be converted to int, because the kernel parameters don't deal too well with unsigned long longs
                     params[selected_mode].LUT_size = DriverHelper::ParseUserLutData(LUT_user_data,
-                                                                                    params[selected_mode].LUT_data,
-                                                                                    sizeof(params[selected_mode].LUT_data) /
-                                                                                    sizeof(params[selected_mode].LUT_data[0]));
+                                                                                    params[selected_mode].LUT_data_x,
+                                                                                    params[selected_mode].LUT_data_y,
+                                                                                    sizeof(params[selected_mode].LUT_data_x) /
+                                                                                    sizeof(params[selected_mode].LUT_data_x[0]));
                 }
                 break;
             }
@@ -161,7 +197,11 @@ int OnGui() {
         auto avail = ImGui::GetContentRegionAvail();
         ImGui::PopStyleColor();
         ImGui::PushItemWidth(avail.x);
+#ifdef USE_INPUT_DRAG
         ImGui::DragFloat("##MouseSmoothness", &mouse_smooth, 0.001, 0.0, 0.99, "Mouse Smoothness %0.2f");
+#else
+        ImGui::SliderFloat("##MouseSmoothness", &mouse_smooth, 0.0, 0.99, "Mouse Smoothness %0.2f");
+#endif
         ImGui::PopItemWidth();
     }
     else
@@ -177,13 +217,17 @@ int OnGui() {
         ImPlot::SetupAxis(ImAxis_Y1, "Output / Input Speed Ratio");
 
         static float last_frame_speed = 0;
-
-        auto mouse_delta = ImGui::GetIO().MouseDelta;
+        static ImVec2 last_mouse_pos = {0,0};
+        double mouse_pos[2];
+        GUI::GetMousePos(mouse_pos, mouse_pos + 1);
+        ImVec2 mouse_delta = {static_cast<float>(mouse_pos[0] - last_mouse_pos.x), static_cast<float>(mouse_pos[1] - last_mouse_pos.y)};//ImGui::GetIO().MouseDelta;
         float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
         float avg_speed = fmaxf(mouse_speed * (1 - mouse_smooth) + last_frame_speed * mouse_smooth, 0.01);
         ImPlotPoint mousePoint_main = ImPlotPoint(avg_speed, avg_speed < params[selected_mode].offset ?
             params[selected_mode].sens :
             functions[selected_mode].EvalFuncAt(avg_speed - params[selected_mode].offset));
+
+        last_mouse_pos = {(float)mouse_pos[0], (float)mouse_pos[1]};
 
         last_frame_speed = avg_speed;
 
@@ -268,8 +312,15 @@ void ResetParameters(void) {
         params[mode] = start_params;
         params[mode].accelMode = mode == 0 ? used_mode : mode;
 
-        if(mode == 6)
-            memcpy(params[mode].LUT_data, start_params.LUT_data, start_params.LUT_size * sizeof(params[selected_mode].LUT_data[0]));
+        if(mode == 6) {
+            memcpy(params[mode].LUT_data_x, start_params.LUT_data_x,
+                   start_params.LUT_size * sizeof(params[selected_mode].LUT_data_x[0]));
+            memcpy(params[mode].LUT_data_y, start_params.LUT_data_y,
+                   start_params.LUT_size * sizeof(params[selected_mode].LUT_data_y[0]));
+        }
+
+        if(mode == 1)
+            params[mode].accel = fminf(0.1, params[mode].accel);
 
         if(mode == 3)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 5), 2.1);
@@ -324,10 +375,10 @@ int main() {
         DriverHelper::GetParameterI("AccelerationMode", start_params.accelMode);
         DriverHelper::GetParameterB("UseSmoothing", start_params.useSmoothing);
         DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
-        DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
+        //DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
         std::string Lut_dataBuf;
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);
-        DriverHelper::ParseDriverLutData(Lut_dataBuf.c_str(), start_params.LUT_data);
+        DriverHelper::ParseDriverLutData(Lut_dataBuf.c_str(), start_params.LUT_data_x, start_params.LUT_data_y);
 
         used_mode = start_params.accelMode;
 
