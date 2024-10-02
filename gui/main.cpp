@@ -1,4 +1,3 @@
-#include <cmath>
 #include <csignal>
 #include "gui.h"
 #include "External/ImGui/implot.h"
@@ -25,7 +24,7 @@ void ResetParameters(void);
 int OnGui() {
     using namespace std::chrono;
 
-    static float mouse_smooth = 0.8;
+    static float mouse_smooth = 0.75;
     static steady_clock::time_point last_apply_clicked;
 
     int hovered_mode = -1;
@@ -73,14 +72,19 @@ int OnGui() {
         change |= ImGui::DragFloat("##InCap_Param", &params[selected_mode].inCap, 0.1, 0, 200, "Input Cap. %0.2f");
         change |= ImGui::DragFloat("##Offset_Param", &params[selected_mode].offset, 0.05, -50, 50, "Offset %0.2f");
         change |= ImGui::DragFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 0.01, 10, "Pre-Scale %0.2f");
+        ImGui::SetItemTooltip("Used to adjust for DPI (Should be 800/DPI)");
+        change |= ImGui::DragFloat("##Adv_Rotation", &params[selected_mode].rotation, 0.1, 0, 180,
+                                        u8"Rotation Angle %0.2f°");
 #else
         change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 10, "Sensitivity %0.2f");
         change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 100, "Output Cap. %0.2f");
         change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
         change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
         change |= ImGui::SliderFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 10, "Pre-Scale %0.2f");
-#endif
         ImGui::SetItemTooltip("Used to adjust for DPI (Should be 800/DPI)");
+        change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, 0, 180,
+                                     u8"Rotation Angle %0.2f°");
+#endif
 
         ImGui::SeparatorText("Advanced");
 
@@ -211,17 +215,29 @@ int OnGui() {
 
     auto avail = ImGui::GetContentRegionAvail();
 
+    ImPlot::SetNextAxesLimits(0, PLOT_X_RANGE, 0, 4);
     /* ---------------------------- FUNCTION PLOT ---------------------------- */
     if(ImPlot::BeginPlot("Function Plot [Input / Output]", {-1, avail.y - 70})) {
         ImPlot::SetupAxis(ImAxis_X1, "Input Speed [counts / ms]");
         ImPlot::SetupAxis(ImAxis_Y1, "Output / Input Speed Ratio");
 
+        static float recent_mouse_top_speed = 0;
+        static steady_clock::time_point last_time_speed_record_broken = steady_clock::now();
         static float last_frame_speed = 0;
         static ImVec2 last_mouse_pos = {0,0};
         double mouse_pos[2];
         GUI::GetMousePos(mouse_pos, mouse_pos + 1);
-        ImVec2 mouse_delta = {static_cast<float>(mouse_pos[0] - last_mouse_pos.x), static_cast<float>(mouse_pos[1] - last_mouse_pos.y)};//ImGui::GetIO().MouseDelta;
+        ImVec2 mouse_delta = {static_cast<float>(mouse_pos[0] - last_mouse_pos.x), static_cast<float>(mouse_pos[1] - last_mouse_pos.y)};
         float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
+        //mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 100;
+        //float dt = fmaxf(ImGui::GetIO().DeltaTime, 0.003);
+        mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 100;
+        if(mouse_speed > recent_mouse_top_speed) {
+            recent_mouse_top_speed = mouse_speed;
+            last_time_speed_record_broken = steady_clock::now();
+        }
+        //float adjusted_smoothness = fminf(sqrtf(mouse_smooth * ImGui::GetIO().DeltaTime * 50) * 2, 0.99);
+        //float adjusted_smoothness = fminf(mouse_smooth * log10f(ImGui::GetIO().DeltaTime + 1) * 1000, 0.99);
         float avg_speed = fmaxf(mouse_speed * (1 - mouse_smooth) + last_frame_speed * mouse_smooth, 0.01);
         ImPlotPoint mousePoint_main = ImPlotPoint(avg_speed, avg_speed < params[selected_mode].offset ?
             params[selected_mode].sens :
@@ -230,6 +246,15 @@ int OnGui() {
         last_mouse_pos = {(float)mouse_pos[0], (float)mouse_pos[1]};
 
         last_frame_speed = avg_speed;
+
+        bool is_record_old = duration_cast<milliseconds>(steady_clock::now() - last_time_speed_record_broken).count() > 1000;
+
+        if(is_record_old)
+            recent_mouse_top_speed = 0;
+
+        ImPlotPoint mousePoint_topSpeed = ImPlotPoint(recent_mouse_top_speed, recent_mouse_top_speed < params[selected_mode].offset ?
+                                                                              params[selected_mode].sens :
+                                                                              functions[selected_mode].EvalFuncAt(recent_mouse_top_speed - params[selected_mode].offset));
 
         // Display currently applied parameters in the background
         if(was_initialized) {
@@ -241,6 +266,10 @@ int OnGui() {
         ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS, functions[selected_mode].x_stride);
 
         ImPlot::PlotScatterG("Mouse Speed", [](int idx, void* data){return *(ImPlotPoint*)data; }, &mousePoint_main, 1);
+        ImPlot::SetNextMarkerStyle(IMPLOT_AUTO, IMPLOT_AUTO /* * !is_record_old*/, ImVec4(180/255.f, 70/255.f, 80/255.f, 1), 2, ImVec4(180/255.f, 70/255.f, 80/255.f, 1));
+        ImPlot::PlotScatterG("Mouse Top Speed", [](int idx, void* data){return *(ImPlotPoint*)data; }, &mousePoint_topSpeed, 1);
+
+        ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, 2);
 
         if(hovered_mode != -1 && selected_mode != hovered_mode) {
             ImPlot::SetNextLineStyle(ImVec4(0.7,0.7,0.3,1));
@@ -375,6 +404,7 @@ int main() {
         DriverHelper::GetParameterI("AccelerationMode", start_params.accelMode);
         DriverHelper::GetParameterB("UseSmoothing", start_params.useSmoothing);
         DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
+        DriverHelper::GetParameterF("RotationAngle", start_params.rotation);
         //DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
         std::string Lut_dataBuf;
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);

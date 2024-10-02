@@ -28,6 +28,9 @@
 #define PRESCALE FP64_ONE
 #define USE_SMOOTHING 1
 
+// Rotation (in radians)
+#define ROTATION_ANGLE 0
+
 // LUT settings
 #define LUT_SIZE 0
 #define LUT_STRIDE FP64_ONE

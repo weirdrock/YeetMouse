@@ -268,6 +268,8 @@ bool Parameters::SaveAll() {
     res &= SetParameterTy("PreScale", preScale);
     res &= SetParameterTy("UseSmoothing", useSmoothing);
 
+    res &= SetParameterTy("RotationAngle", rotation * DEG2RAD);
+
     // LUT
     auto encodedLutData = EncodeLutData(LUT_data_x, LUT_data_y, LUT_size);
     if(!encodedLutData.empty()) {

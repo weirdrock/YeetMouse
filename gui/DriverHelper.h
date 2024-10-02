@@ -1,9 +1,12 @@
 #ifndef YEETMOUSE_DRIVERHELPER_H
 #define YEETMOUSE_DRIVERHELPER_H
 
+#include <cmath>
 #include "string"
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
+
+#define DEG2RAD (M_PI / 180.0)
 
 namespace DriverHelper {
     bool GetParameterF(const std::string& param_name, float& value);
@@ -41,6 +44,7 @@ struct Parameters {
     float scrollAccel = 1.0f;
     int accelMode = 0;
     bool useSmoothing = true; // true/false
+    float rotation = 0; // Stored in degrees, converted to radians when writing out
 
     /// The issue of performance with LUT is currently solved with a fixed stride, but another approach would be to
     /// store separately x and y values, sort both by x values, and do a binary search every time you want to find points.

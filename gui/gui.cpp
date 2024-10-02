@@ -155,7 +155,7 @@ int GUI::Setup(int (*OnGui)())
     if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync'
+    glfwSwapInterval(1); // Enable 'vsync'
 
     glfwSetWindowSizeLimits(window, 960, 480, GLFW_DONT_CARE, GLFW_DONT_CARE);
 

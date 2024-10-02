@@ -65,8 +65,10 @@ PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (do
 PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
 
 PARAM_UL(LutSize,       LUT_SIZE,           "LUT data array size");
-//PARAM_F(LutStride,      LUT_STRIDE,         "Distance between y values for the LUT");
+//PARAM_F(LutStride,      LUT_STRIDE,       "Distance between y values for the LUT");
 PARAM_ARR(LutDataBuf,   LUT_DATA,           "Data of the LUT stored in a human form"); // g_LutDataBuf should not be used!
+
+PARAM_F(RotationAngle, ROTATION_ANGLE,      "Amount of clockwise rotation (in radians)");
 
 FP_LONG g_LutData_x[MAX_LUT_ARRAY_SIZE]; // Array to store the x-values of the LUT data
 FP_LONG g_LutData_y[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
@@ -101,7 +103,10 @@ struct ModesConstants {
 
     FP_LONG accel_sub_1;
     FP_LONG exp_sub_1;
-} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, };
+
+    // Rotation
+    FP_LONG sin_a, cos_a;
+} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0 };
 
 // Recalculate new modes constants
 static void update_constants(void) {
@@ -112,6 +117,10 @@ static void update_constants(void) {
     // Jump
     modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
     modesConst.C0 = FP64_DivPrecise(FP64_Mul(modesConst.accel_sub_1, FP64_Log(FP64_Add(1, FP64_Exp(FP64_Mul(modesConst.r, g_Midpoint))))), modesConst.r);
+
+    // Rotation (precalculate the trig. functions)
+    modesConst.sin_a = FP64_Sin(g_RotationAngle);
+    modesConst.cos_a = FP64_Cos(g_RotationAngle);
 }
 
 static ktime_t g_next_update = 0;
@@ -131,6 +140,7 @@ INLINE void update_params(ktime_t now)
     PARAM_UPDATE(Exponent);
     PARAM_UPDATE(Midpoint);
     PARAM_UPDATE(PreScale);
+    PARAM_UPDATE(RotationAngle);
     PARAM_UPDATE_UL(LutSize);
     //PARAM_UPDATE(LutStride);
     if(g_LutSize > MAX_LUT_ARRAY_SIZE)
@@ -181,8 +191,8 @@ int accelerate(int *x, int *y, int *wheel)
     static FP_LONG carry_y = 0;
     static FP_LONG carry_whl = 0;
     static FP_LONG last_ms = One;
-    //static long long iter = 0;
-    static ktime_t last;//, elapsed_time;
+    static long long iter = 0;
+    static ktime_t last;//, elapsed_time, highest_elapsed_time;
     ktime_t now;
     int status = 0;
 
@@ -310,6 +320,7 @@ int accelerate(int *x, int *y, int *wheel)
             }
         }
 
+        // LUT (Look-Up-Table)
         else if(g_AccelerationMode == 6) {
             // Assumes the size and values are valid. Please don't change LUT parameters by hand.
 
@@ -324,7 +335,7 @@ int accelerate(int *x, int *y, int *wheel)
                         l = mid + 1;
                     } else if (speed < g_LutData_x[mid])
                         r = mid - 1;
-                    else { // Should never happen
+                    else {
                         break;
                     }
                 }
@@ -368,6 +379,13 @@ int accelerate(int *x, int *y, int *wheel)
     // I don't do wheel, sorry
     //delta_whl *= g_ScrollsPerTick/3.0f;
 
+    // Apply Rotation after everything else to keep the precision
+    if(g_RotationAngle != 0) {
+        FP_LONG new_delta_x = FP64_Mul(delta_x, modesConst.cos_a) - FP64_Mul(delta_y, modesConst.sin_a);
+        delta_y = FP64_Mul(delta_x, modesConst.sin_a) + FP64_Mul(delta_y, modesConst.cos_a);
+        delta_x = new_delta_x;
+    }
+
     //Cast back to int
     *x = FP64_RoundToInt(delta_x);
     *y = FP64_RoundToInt(delta_y);
@@ -380,12 +398,16 @@ int accelerate(int *x, int *y, int *wheel)
     carry_y = FP64_Sub(delta_y, FP64_FromInt(*y));
     //carry_whl = delta_whl - *wheel;
 
-    // Used to very roughly estimate the performance
-    //elapsed_time += ktime_sub(ktime_get(), now);
-    //if(iter++ == 1000) {
+    // Used to very roughly estimate the performance, and 0.1% lows
+    //ktime_t iter_time = ktime_sub(ktime_get(), now);
+    //elapsed_time += iter_time;
+    //if(iter_time > highest_elapsed_time)
+    //    highest_elapsed_time = iter_time;
+    //if(++iter == 1000) {
     //    iter = 0;
-    //    pr_info("Leetmouse: Averaged at %lldns during 1000 iters\n", ktime_to_ns(elapsed_time));
+    //    pr_info("Leetmouse: Sum of 1000 iters: %lldns, low 0.1%%: %lldns\n", ktime_to_ns(elapsed_time), highest_elapsed_time);
     //    elapsed_time = 0;
+    //    highest_elapsed_time = 0;
     //}
 
     return status;
