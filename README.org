@@ -25,8 +25,7 @@
 
 *** Starting
    Keep in mind that the program needs to be *run with sudo privileges*.
-   To run, simply use =sudo ./YeetMouseGui=
-
+   To run, simply use =sudo -E ./YeetMouseGui=
 
 ** Arch/Manjaro
    Since the maintainer of =LEETMOUSE= is an Arch and Manjaro user, a =PKGBUILD= has been written for seamless integration into pacman.
@@ -45,6 +44,9 @@
    sudo pacman -R leetmouse-driver-dkms
    #+end_src
    All your mice should now be bound to the generic usbhid driver again.
+
+** NixOS
+  Please refer to [[nix/][NixOS instructions]].
    
 ** Other distros
    Other distributions' package-managers are not yet supported and thus need a manual installation. However Debian based systems are planned.
