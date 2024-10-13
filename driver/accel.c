@@ -223,9 +223,9 @@ int accelerate(int *x, int *y, int *wheel)
     last = now;
     //if(ms < 1) ms = last_ms;    //Sometimes, urbs appear bunched -> Beyond µs resolution so the timing reading is plain wrong. Fallback to last known valid frametime
     // Editor node: I have no idea, what this line above really does, but commenting it out solves all my problems
-    // with incorrect data. Its seems to that it tries to fix a problem that doesnt exist, or doesnt exist on my
+    // with incorrect data. It seems that it tries to fix a problem that doesn't exist, or doesn't exist on my
     // specific setup (PC / System / Mice)
-    if(dt >= fp64_100) ms = fp64_100;
+    if(ms > fp64_100) ms = fp64_100;
 
     //if(ms > 100) ms = 100;      //Original InterAccel has 200 here. RawAccel rounds to 100. So do we.
     last_ms = ms;

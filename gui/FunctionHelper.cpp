@@ -1,7 +1,5 @@
 #include <cmath>
 
-#define M_PI 3.14159265358979323846f
-
 #include "FunctionHelper.h"
 
 CachedFunction::CachedFunction(float xStride, Parameters *params)
