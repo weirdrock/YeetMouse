@@ -2,7 +2,19 @@
 #define YEETMOUSE_DRIVERHELPER_H
 
 #include <cmath>
-#include "string"
+#include <utility>
+#include <vector>
+#include <string>
+
+#include <iostream>
+#include <string>
+#include <vector>
+#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <sys/types.h>
+#include <unistd.h>
+#include <filesystem>
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
@@ -30,7 +42,125 @@ namespace DriverHelper {
     /// Returns the number of parsed values
     size_t ParseDriverLutData(const char* user_data, double* out_x, double* out_y);
 
+    // Handle Devices
+    inline bool BindToDriver(const char* driver_name, std::string device_id) {
+        auto f_path = std::string("/sys/bus/usb/drivers/") + driver_name + "/bind";
+        std::ofstream file(std::string("/sys/bus/usb/drivers/") + driver_name + "/bind");
+        if(file.bad())
+            return false;
+
+        bool write_status = (bool)(file << device_id);
+        if(!write_status)
+            return false;
+
+        file.close();
+
+        usleep(10000);
+
+        // Check if the device was actually bound
+        return std::filesystem::is_directory((std::string("/sys/bus/usb/drivers/") + driver_name + "/" + device_id));
+    }
+
+    inline bool UnBindFromDriver(const char* driver_name, std::string device_id) {
+        auto f_path = std::string("/sys/bus/usb/drivers/") + driver_name + "/unbind";
+        std::ofstream file(std::string("/sys/bus/usb/drivers/") + driver_name + "/unbind");
+        if(file.bad())
+            return false;
+
+        bool write_status = (bool)(file << device_id);
+        if(!write_status)
+            return false;
+
+        file.close();
+
+        usleep(10000);
+
+        // Check if the device was actually unbound
+        return !std::filesystem::is_directory((std::string("/sys/bus/usb/drivers/") + driver_name + "/" + device_id));
+    }
+
+    struct DeviceInfo {
+        std::string full_name;
+        std::string name;
+        std::string driver_name;
+        std::string manufacturer;
+        std::string device_id; //<controller>-<ports>:<configuration>-<interface>
+        std::string manufacturer_id;
+        std::string max_power;
+
+        int interfaceClass = 0;
+        int interfaceProtocol    = 0;
+        int interfaceSubClass = 0;
+
+        DeviceInfo() = default;
+        explicit DeviceInfo(std::string id): device_id(std::move(id)) {};
+
+        bool is_bound_to_leetmouse = false;
+    };
+
+    std::vector<DeviceInfo> DiscoverDevices();
+
 } // DriverHelper
+
+inline const char* interfaceClass2String(int interfaceClass) {
+    switch (interfaceClass) {
+        case 3:
+            return "HID";
+        case 1:
+            return "Audio Interface";
+        default:
+            return "Other";
+    }
+}
+
+inline const char* interfaceSubClass2String(int interfaceSubClass) {
+    switch (interfaceSubClass) {
+        case 0:
+            return "No Subclass";
+        case 1:
+            return "Boot interface";
+        default:
+            return "Other";
+    }
+}
+
+inline const char* interfaceProtocol2String(int interfaceProtocol, int interfaceClass = 0) {
+    if(interfaceClass == 3) {
+        switch (interfaceProtocol) {
+            case 1:
+                return "Keyboard";
+            case 2:
+                return "Mouse";
+            default:
+                return "Other";
+        }
+    }
+    else {
+        return "Other";
+    }
+}
+
+// This is awfully slow btw.
+inline std::string decodeVendorId(const std::string& vendorId) {
+    std::ifstream file("/usr/share/hwdata/usb.ids");
+    if (!file.is_open()) {
+        return "Unknown";
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.find('#') == 0) {
+            continue; // skip comments
+        }
+
+        std::string id = line;
+        if (id.find(vendorId) == 0) {
+            return line.substr(line.find("  ") + 2);
+        }
+    }
+
+    return "Unknown";
+}
 
 struct Parameters {
     float sens = 1.0f;

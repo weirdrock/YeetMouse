@@ -11,6 +11,9 @@ endif
 # glfw and OpenGL are required to compile!
 #sudo apt install libglfw3-dev
 
+# If I even decide to switch to libusb:
+#sudo apt-get install libusb-1.0-0-dev
+
 # Define the source files
 SOURCES = main.cpp gui.cpp DriverHelper.cpp ImGuiExtensions.cpp FunctionHelper.cpp $(wildcard External/ImGui/*.cpp) $(wildcard gui/lib/*.cpp)
 
@@ -37,8 +40,12 @@ External/ImGui/%.o: External/ImGui/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 
-.PHONY: clean
+.PHONY: clean clean-all
 
+clean-all: clean
+	rm -rf External/ImGui/*.o
+
+# Removing the imgui object files is kinda pointless for most cases and it takes a lot of time to rebuild
 clean:
 	rm -rf *.o
-	rm -rf External/ImGui/*.o
+	rm $(TARGET)
