@@ -20,7 +20,7 @@ struct parser_context {
     unsigned int offset;                        // Local offset in this report ID context
 };
 
-#define NUM_USAGES 32
+#define NUM_USAGES 64
 #define NUM_CONTEXTS 32                             // This should be more than enough for a HID mouse. If we exceed this number, the parser below will eventually fail
 #define SET_ENTRY(entry, _id, _offset, _size, _sign) \
     entry.id = _id;                                 \
@@ -30,8 +30,8 @@ struct parser_context {
 
 int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_positions *pos)
 {
-    int r_count = 0, r_size = 0, r_sgn = 0, len = 0;
-    int r_usage[NUM_USAGES];
+    int r_count = max(NUM_USAGES, 1), r_size = 0, r_sgn = 0, len = 0;
+    int* r_usage = NULL;
     unsigned char ctl, button = 0;
     unsigned char *data;
 
@@ -42,7 +42,12 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
     struct parser_context contexts[NUM_CONTEXTS];    // We allow up to NUM_CONTEXTS different parsing contexts. Any further will be ignored.
     struct parser_context *c = contexts;             // The current context
 
-    for(n = 0; n < NUM_USAGES; n++){
+    r_usage = kmalloc(r_count, GFP_KERNEL);
+    if(!r_usage) {
+        printk("LEETMOUSE: Failed to allocate memory for r_usage");
+        return -ENOMEM;
+    }
+    for(n = 0; n < r_count; n++){
         r_usage[n] = 0;
     }
     
@@ -63,11 +68,28 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
         //Determine the size
         if(ctl == D_REPORT_SIZE)  r_size = (int) data[0];
         if(ctl == D_REPORT_COUNT){
+            int old_r_count = r_count;
             r_count = (int) data[0];
 
-            if (r_count > NUM_USAGES){
-                printk("LEETMOUSE: parse_report_desc r_count > NUM_USAGES (%d). Should only happen on first probe.", NUM_USAGES);
-                return -1;
+            // Check if the new count is greater
+            if(old_r_count < r_count) {
+                printk("LEETMOUSE: New r_count (%i) is bigger than the old r_count (%i)\n", r_count, old_r_count);
+
+                // Try to reallocate more space if needed
+                // (this should happen at most once, but we can handle more just in case)
+                int* new_r_usage = krealloc(r_usage, r_count, GFP_KERNEL);
+                if(!new_r_usage) {
+                    printk("LEETMOUSE: Failed to allocate memory for r_usage");
+                    kfree(r_usage);
+                    return -ENOMEM;
+                }
+                else
+                    r_usage = new_r_usage;
+
+                // Zero only the new values of r_usage
+                for(n = old_r_count; n < r_count; n++){
+                    r_usage[n] = 0;
+                }
             }
         }
 
@@ -90,7 +112,7 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
                     if(contexts[n].id == 0){
                         c = contexts + n;
                         c->id = data[0];
-                        c->offset = 8;              // Since we use a Report ID , which preceeds the actual report (1 byte), all offsets are shifted
+                        c->offset = 8;              // Since we use a Report ID , which precedes the actual report (1 byte), all offsets are shifted
                         break;
                     }
                 }
@@ -121,7 +143,12 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
                 data[0] == D_USAGE_X ||
                 data[0] == D_USAGE_Y
             ) {
-                for(n = 0; n < NUM_USAGES; n++){
+                for(n = 0; n < r_count; n++){
+                    if(!r_usage) {
+                        printk("LEETMOUSE: OUT OF BOUNDS R/W, r_usage not yet initialized!");
+                        kfree(r_usage);
+                        return -ENODEV;
+                    }
                     if(!r_usage[n]){
                         r_usage[n] = (int) data[0];
                         break;
@@ -134,6 +161,11 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
         //Check, if we reached the end of this input data type
         if(ctl == D_INPUT || ctl == D_FEATURE){
             //Buttons are handled separately
+            if(!r_usage) {
+                printk("LEETMOUSE: OUT OF BOUNDS R/W, r_usage not yet initialized!");
+                kfree(r_usage);
+                return -ENODEV;
+            }
             if(!button && r_usage[0] == D_USAGE_BUTTON){
                 SET_ENTRY(pos->button, c->id, c->offset, r_size*r_count, r_sgn);
                 button = 1;
@@ -155,7 +187,7 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
                 }
             }
             //Reset usages
-            for(n = 0; n < NUM_USAGES; n++){
+            for(n = 0; n < r_count; n++){
                 r_usage[n] = 0;
             }
             //Increment offset
@@ -171,6 +203,7 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
         printk("WHL\t(%d): Offset %u\tSize %u\t Sign %u",   pos->wheel.id,      (unsigned int) pos->wheel.offset,   pos->wheel.size,    pos->wheel.sgn);
     }
 
+    kfree(r_usage);
     return 0;
 }
 

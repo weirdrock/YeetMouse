@@ -172,7 +172,7 @@ static int usb_mouse_probe(struct usb_interface *intf, const struct usb_device_i
 
     if(strstr(dev->product, "Keyboard")) { // This caused issues with keyboard media buttons / volume roller
         printk("Probed product is a kb, not a mouse! (%s)\n", dev->product);
-        return 1;
+        return -ENODEV;
     }
 
     //Leetmouse Mod END
