@@ -585,6 +585,7 @@ int main() {
         DriverHelper::GetParameterB("UseSmoothing", start_params.useSmoothing);
         DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
         DriverHelper::GetParameterF("RotationAngle", start_params.rotation);
+        start_params.rotation /= DEG2RAD;
         //DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
         std::string Lut_dataBuf;
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);

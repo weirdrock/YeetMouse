@@ -261,6 +261,7 @@ bool Parameters::SaveAll() {
     res &= SetParameterTy("InputCap", inCap);
     res &= SetParameterTy("Offset", offset);
     res &= SetParameterTy("AccelerationMode", accelMode);
+    res &= SetParameterTy("RotationAngle", rotation * DEG2RAD);
 
     // Specific
     res &= SetParameterTy("Acceleration", accel);
@@ -268,8 +269,6 @@ bool Parameters::SaveAll() {
     res &= SetParameterTy("Midpoint", midpoint);
     res &= SetParameterTy("PreScale", preScale);
     res &= SetParameterTy("UseSmoothing", useSmoothing);
-
-    res &= SetParameterTy("RotationAngle", rotation * DEG2RAD);
 
     // LUT
     auto encodedLutData = EncodeLutData(LUT_data_x, LUT_data_y, LUT_size);
@@ -282,7 +281,8 @@ bool Parameters::SaveAll() {
     else if(accelMode == 6)
         return false;
 
-    DriverHelper::SaveParameters();
+    if(res)
+        res &= DriverHelper::SaveParameters();
 
     return res;
 }

@@ -208,7 +208,7 @@ int accelerate(int *x, int *y, int *wheel)
     //delta_y = FP64_Add(delta_y, FP64_FromInt((int) buffer_y)); buffer_y = 0;
 
     //Calculate frametime
-    now = ktime_get();
+    now = ktime_get(); // ns
     long long dt = (now - last);
     //int frac = dt % 10000;
     // We can't just store milliseconds as this would lose a lot of precision (nano -> mili, that's 10^-6 difference).

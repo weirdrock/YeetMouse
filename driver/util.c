@@ -3,6 +3,7 @@
 #include "util.h"
 #include <linux/kernel.h>   //fixed-len datatypes
 #include <linux/string.h>   //memcpy
+#include <linux/slab.h>
 
 // ########## Kernel module parameters
 // Debug parameters
@@ -30,7 +31,7 @@ struct parser_context {
 
 int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_positions *pos)
 {
-    int r_count = max(NUM_USAGES, 1), r_size = 0, r_sgn = 0, len = 0;
+    int r_count = max(NUM_USAGES, 1), r_max_count = r_count, r_size = 0, r_sgn = 0, len = 0;
     int* r_usage = NULL;
     unsigned char ctl, button = 0;
     unsigned char *data;
@@ -42,7 +43,7 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
     struct parser_context contexts[NUM_CONTEXTS];    // We allow up to NUM_CONTEXTS different parsing contexts. Any further will be ignored.
     struct parser_context *c = contexts;             // The current context
 
-    r_usage = kmalloc(r_count, GFP_KERNEL);
+    r_usage = kmalloc(r_count * sizeof(int), GFP_KERNEL);
     if(!r_usage) {
         printk("LEETMOUSE: Failed to allocate memory for r_usage");
         return -ENOMEM;
@@ -68,16 +69,16 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
         //Determine the size
         if(ctl == D_REPORT_SIZE)  r_size = (int) data[0];
         if(ctl == D_REPORT_COUNT){
-            int old_r_count = r_count;
+            //int old_r_count = r_count;
             r_count = (int) data[0];
 
             // Check if the new count is greater
-            if(old_r_count < r_count) {
-                printk("LEETMOUSE: New r_count (%i) is bigger than the old r_count (%i)\n", r_count, old_r_count);
+            if(r_max_count < r_count) {
+                printk("LEETMOUSE: New r_count (%i) is bigger than the max r_count (%i)\n", r_count, r_max_count);
 
                 // Try to reallocate more space if needed
                 // (this should happen at most once, but we can handle more just in case)
-                int* new_r_usage = krealloc(r_usage, r_count, GFP_KERNEL);
+                int* new_r_usage = krealloc(r_usage, r_count * sizeof(int), GFP_KERNEL);
                 if(!new_r_usage) {
                     printk("LEETMOUSE: Failed to allocate memory for r_usage");
                     kfree(r_usage);
@@ -87,9 +88,15 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
                     r_usage = new_r_usage;
 
                 // Zero only the new values of r_usage
-                for(n = old_r_count; n < r_count; n++){
+                for(n = r_max_count; n < r_count; n++){
                     r_usage[n] = 0;
                 }
+
+                // Save the new max value
+                r_max_count = r_count;
+            }
+            else {
+                printk("LEETMOUSE: New r_count (%i) is equal or smaller than the max r_count (%i)\n", r_count, r_max_count);
             }
         }
 
