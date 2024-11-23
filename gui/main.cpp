@@ -4,24 +4,27 @@
 #include "DriverHelper.h"
 #include "FunctionHelper.h"
 #include "ImGuiExtensions.h"
-#include "chrono"
+#include "ConfigHelper.h"
+#include <chrono>
 
 //#define USE_INPUT_DRAG
 
 /* TODO
- * - Config export/import (from and to clipboard) in a human readable format
+ * - Config export/import (from and to clipboard) in a human readable format or config.h
  */
 
-int selected_mode = 1;
+AccelMode selected_mode = AccelMode_Linear;
 
 const char* AccelModes[] = {"Current", "Linear", "Power", "Classic", "Motivity", "Jump", "Look Up Table"};
-#define NUM_MODES (sizeof(AccelModes) / sizeof(char *))
+#define NUM_MODES AccelMode_Count //(sizeof(AccelModes) / sizeof(char *))
 
 Parameters params[NUM_MODES]; // Driver parameters for each mode
 CachedFunction functions[NUM_MODES]; // Driver parameters for each mode
-int used_mode = 1;
+AccelMode used_mode = AccelMode_Linear;
 bool was_initialized = false;
 bool has_privilege = false;
+
+static char LUT_user_data[4096];
 
 void ResetParameters();
 #define RefreshDevices() {devices = DriverHelper::DiscoverDevices(); \
@@ -37,9 +40,70 @@ int OnGui() {
 
     bool open_bind_error_popup = false;
 
+
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+            if (ImGui::BeginMenu("Export")) {
+                if(ImGui::MenuItem("Plain text")) {
+                    //printf("Plain text:\n%s\n", ConfigHelper::ExportPlainText(params[selected_mode], true).c_str());
+                    ConfigHelper::ExportPlainText(params[selected_mode], true);
+                }
+                ImGui::SetItemTooltip("Right click to copy to clipboard");
+                if(ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                    auto exp_text = ConfigHelper::ExportPlainText(params[selected_mode], false);
+                    ImGui::SetClipboardText(exp_text.c_str());
+                    //ImGui::CloseCurrentPopup();
+                }
+
+                if(ImGui::MenuItem("Config.h format")) {
+                    //printf("Plain text:\n%s\n", ConfigHelper::ExportConfig(params[selected_mode], true).c_str());
+                    ConfigHelper::ExportConfig(params[selected_mode], true);
+                }
+                ImGui::SetItemTooltip("Right click to copy to clipboard");
+                if(ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                    auto exp_text = ConfigHelper::ExportConfig(params[selected_mode], false);
+                    ImGui::SetClipboardText(exp_text.c_str());
+                    //ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndMenu();
+            }
+
+            Parameters imported_params;
+            bool changed = false;
+            if (ImGui::MenuItem("Import")) {
+                if(ConfigHelper::ImportFile(LUT_user_data, imported_params)) {
+                    changed = true;
+                }
+
+            }
+
+            ImGui::SetItemTooltip("Right click to import from clipboard");
+            if(ImGui::IsItemClicked(ImGuiMouseButton_Right)) {
+                if(ConfigHelper::ImportClipboard(LUT_user_data, ImGui::GetClipboardText(), imported_params)) {
+                    changed = true;
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+
+            if(changed) {
+                for (int i = 1; i < NUM_MODES; i++) {
+                    params[i] = imported_params;
+                    params[i].accelMode = static_cast<AccelMode>(i == 0 ? used_mode : i);
+
+                    functions[i] = CachedFunction(((float) PLOT_X_RANGE) / PLOT_POINTS, &params[i]);
+                    functions[i].PreCacheFunc();
+                }
+
+                selected_mode = imported_params.accelMode;
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+
     /* ---------------------------- TOP TABS ---------------------------- */
     if(ImGui::BeginTabBar("TopTabBar")) {
-        if(ImGui::BeginTabItem("Settings")) {
+        if(ImGui::BeginTabItem("Configuration")) {
 
             int hovered_mode = -1;
 
@@ -54,7 +118,7 @@ int OnGui() {
                 for (int i = 1; i < NUM_MODES; i++) {
                     const char *accel = AccelModes[i];
                     if (ImGui::ModeSelectable(accel, i == selected_mode, 0, {-1, 0}))
-                        selected_mode = i;
+                        selected_mode = static_cast<AccelMode>(i);
                     if(ImGui::IsItemHovered())
                         hovered_mode = i;
                 }
@@ -95,7 +159,7 @@ int OnGui() {
                 change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
                 change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
                 change |= ImGui::SliderFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 10, "Pre-Scale %0.2f");
-                ImGui::SetItemTooltip("Used to adjust for DPI (Should be 800/DPI)");
+                ImGui::SetItemTooltip("Used to adjust for different DPI values (Set to 800/DPI)");
                 change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, 0, 180,
                                              u8"Rotation Angle %0.2f°");
         #endif
@@ -105,31 +169,32 @@ int OnGui() {
                 // Mode Specific Parameters
                 ImGui::PushID(selected_mode);
                 switch(selected_mode) {
-                    case 0:
+                    case AccelMode_Current:
                     {
                         break;
                     }
-                    case 1: // Linear
+                    case AccelMode_Linear: // Linear
                     {
         #ifdef USE_INPUT_DRAG
                         change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.0001, 0.0005, 0.1, "Acceleration %0.4f", ImGuiSliderFlags_Logarithmic);
         #else
                         change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.0005, 0.1, "Acceleration %0.4f", ImGuiSliderFlags_Logarithmic);
+                        ImGui::SetItemTooltip("Ctrl+LMB to input any value you want");
         #endif
                         break;
                     }
-                    case 2: // Power
+                    case AccelMode_Power: // Power
                     {
         #ifdef USE_INPUT_DRAG
                         change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0.01, 10, "Acceleration %0.2f");
                         change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 0.01, 1, "Exponent %0.2f");
         #else
-                        change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 10, "Acceleration %0.2f");
+                        change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 5, "Acceleration %0.2f");
                         change |= ImGui::SliderFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 1, "Exponent %0.2f");
         #endif
                         break;
                     }
-                    case 3: // Classic
+                    case AccelMode_Classic: // Classic
                     {
         #ifdef USE_INPUT_DRAG
                         change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 0.001, 2, "Acceleration %0.3f");
@@ -140,18 +205,18 @@ int OnGui() {
         #endif
                         break;
                     }
-                    case 4: // Motivity
+                    case AccelMode_Motivity: // Motivity
                     {
         #ifdef USE_INPUT_DRAG
                         change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0.01, 10, "Acceleration %0.2f");
                         change |= ImGui::DragFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.05, 0.1, 50, "Start %0.2f");
         #else
                         change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 10, "Acceleration %0.2f");
-                        change |= ImGui::SliderFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.1, 50, "Start %0.2f");
+                        change |= ImGui::SliderFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.1, 50, "Midpoint %0.2f");
         #endif
                         break;
                     }
-                    case 5: // Jump
+                    case AccelMode_Jump: // Jump
                     {
         #ifdef USE_INPUT_DRAG
                         change |= ImGui::DragFloat("##Accel_Param", &params[selected_mode].accel, 0.01, 0, 10, "Acceleration %0.2f");
@@ -159,15 +224,14 @@ int OnGui() {
                         change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 0.01, 1, "Smoothness %0.2f");
         #else
                         change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0, 10, "Acceleration %0.2f");
-                        change |= ImGui::SliderFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.1, 50, "Start %0.2f");
+                        change |= ImGui::SliderFloat("##MidPoint_Param", &params[selected_mode].midpoint, 0.1, 50, "Midpoint %0.2f");
                         change |= ImGui::SliderFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 1, "Smoothness %0.2f");
         #endif
                         change |= ImGui::Checkbox("##Smoothing_Param", &params[selected_mode].useSmoothing);
                         ImGui::SameLine(); ImGui::Text("Use Smoothing");
                         break;
                     }
-                    case 6: {
-                        static char LUT_user_data[4096];
+                    case AccelMode_Lut: {
                         ImGui::Text("LUT data:");
                         change |= ImGui::InputTextWithHint("##LUT data", "x1,y1;x2,y2;x3,y3...", LUT_user_data, sizeof(LUT_user_data), ImGuiInputTextFlags_AutoSelectAll);
                         ImGui::SetItemTooltip("Format: x1,y1;x2,y2;x3,y3... (commas and semicolons are treated equally)");
@@ -218,8 +282,9 @@ int OnGui() {
         #ifdef USE_INPUT_DRAG
                 ImGui::DragFloat("##MouseSmoothness", &mouse_smooth, 0.001, 0.0, 0.99, "Mouse Smoothness %0.2f");
         #else
-                ImGui::SliderFloat("##MouseSmoothness", &mouse_smooth, 0.0, 0.99, "Mouse Smoothness %0.2f");
+                ImGui::SliderFloat("##MouseSmoothness", &mouse_smooth, 0.0, 0.99, "Mouse Speed Smoothness %0.2f");
         #endif
+                ImGui::SetItemTooltip("Smooths out the mouse movement indicator (The small orange dot on the graph)");
                 ImGui::PopItemWidth();
             }
             else
@@ -245,7 +310,7 @@ int OnGui() {
                 float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
                 //mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 100;
                 //float dt = fmaxf(ImGui::GetIO().DeltaTime, 0.003);
-                mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 100;
+                mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 1000;
                 if(mouse_speed > recent_mouse_top_speed) {
                     recent_mouse_top_speed = mouse_speed;
                     last_time_speed_record_broken = steady_clock::now();
@@ -366,6 +431,9 @@ int OnGui() {
             }
             else
                 ImGui::PopStyleColor();
+
+            ImGui::SetItemTooltip("Use only when a some device isn't bound automatically");
+
             ImGui::EndChild();
             ImGui::PopStyleVar(2);
 
@@ -392,10 +460,10 @@ int OnGui() {
                 ImGui::Unindent();
 
                 ImGui::Text("Device ID:"); ImGui::Indent();
-                ImGui::Text("%s", deviceInfo.device_id.c_str());
+                if(ImGui::Selectable(deviceInfo.device_id.c_str(), false))
+                    ImGui::SetClipboardText(deviceInfo.device_id.c_str());
                 ImGui::Unindent();
                 ImGui::SetItemTooltip("Click to copy");
-                ImGui::SetClipboardText(deviceInfo.device_id.c_str());
 
                 ImGui::Text("Manufacturer:"); ImGui::Indent();
                 ImGui::Text("%s", deviceInfo.manufacturer.c_str());
@@ -508,7 +576,7 @@ int OnGui() {
                                             ImColor::HSV(0.975, 0.9, 1).operator ImU32(), "Running without root privileges.\nSome functions will not be available");
 
     if(!was_initialized)
-        ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 25),
+        ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 55),
                                             ImColor::HSV(0.975, 0.9, 1).operator ImU32(), "Could not read and initialize driver parameters, working on dummy data");
 
     return 0;
@@ -519,7 +587,7 @@ Parameters start_params;
 void ResetParameters(void) {
     for(int mode = 0; mode < NUM_MODES; mode++) {
         params[mode] = start_params;
-        params[mode].accelMode = mode == 0 ? used_mode : mode;
+        params[mode].accelMode = static_cast<AccelMode>(mode == 0 ? used_mode : mode);
 
         if(mode == 6) {
             memcpy(params[mode].LUT_data_x, start_params.LUT_data_x,
@@ -581,7 +649,7 @@ int main() {
         DriverHelper::GetParameterF("Exponent", start_params.exponent);
         DriverHelper::GetParameterF("Midpoint", start_params.midpoint);
         DriverHelper::GetParameterF("PreScale", start_params.preScale);
-        DriverHelper::GetParameterI("AccelerationMode", start_params.accelMode);
+        DriverHelper::GetParameterI("AccelerationMode", reinterpret_cast<int &>(start_params.accelMode));
         DriverHelper::GetParameterB("UseSmoothing", start_params.useSmoothing);
         DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
         DriverHelper::GetParameterF("RotationAngle", start_params.rotation);
@@ -589,11 +657,12 @@ int main() {
         //DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
         std::string Lut_dataBuf;
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);
+        Lut_dataBuf.copy(LUT_user_data, sizeof(LUT_user_data), 0);
         DriverHelper::ParseDriverLutData(Lut_dataBuf.c_str(), start_params.LUT_data_x, start_params.LUT_data_y);
 
         used_mode = start_params.accelMode;
 
-        selected_mode = start_params.accelMode % NUM_MODES;
+        selected_mode = static_cast<AccelMode>(start_params.accelMode % NUM_MODES);
 
         was_initialized = true;
     }

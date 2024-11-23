@@ -103,6 +103,8 @@ static FP_LONG FP64_FromDouble(double v) {
     return (FP_LONG) (v * 4294967296.0);
 }
 
+#define C0NST_FP64_FromDouble(v) ((FP_LONG) (v * 4294967296.0))
+
 /// <summary>
 /// Converts a float to a fixed-point value.
 /// </summary>

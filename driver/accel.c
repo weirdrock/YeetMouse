@@ -23,7 +23,7 @@ MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Curr
 
 //Convenient helper for float based parameters, which are passed via a string to this module (must be individually parsed via atof() - available in util.c)
 #define PARAM_F(param, default, desc)                           \
-    FP_LONG g_##param = (long long)default;                     \
+    FP_LONG g_##param = C0NST_FP64_FromDouble(default);                     \
     static char* g_param_##param = s(default);                  \
     module_param_named(param, g_param_##param, charp, 0644);    \
     MODULE_PARM_DESC(param, desc);
@@ -48,7 +48,7 @@ MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Curr
 
 // Simple module parameters (instant update)
 PARAM(no_bind,          0,                  "This will disable binding to this driver via 'leetmouse_bind' by udev.");
-PARAM(update,           0,                  "Triggers an update of the acceleration parameters below");
+PARAM(update,           1,                  "Triggers an update of the acceleration parameters below");
 PARAM(AccelerationMode, ACCELERATION_MODE,  "Sets the algorithm to be used for acceleration");
 
 // Acceleration parameters (type pchar. Converted to float via "update_params" triggered by /sys/module/leetmouse/parameters/update)
@@ -62,7 +62,7 @@ PARAM_F(Exponent,       EXPONENT,           "Exponent for algorithms that use it
 PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function");
 PARAM_F(PreScale,       PRESCALE,           "Parameter to adjust for the DPI");
 PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (doesn't apply to all)");
-PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
+//PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
 
 PARAM_UL(LutSize,       LUT_SIZE,           "LUT data array size");
 //PARAM_F(LutStride,      LUT_STRIDE,       "Distance between y values for the LUT");
@@ -72,6 +72,8 @@ PARAM_F(RotationAngle, ROTATION_ANGLE,      "Amount of clockwise rotation (in ra
 
 FP_LONG g_LutData_x[MAX_LUT_ARRAY_SIZE]; // Array to store the x-values of the LUT data
 FP_LONG g_LutData_y[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
+
+#define FP64_ONE 4294967296ll
 
 // Converts given string to a unsigned long
 unsigned long atoul(const char *str) {
@@ -136,7 +138,7 @@ INLINE void update_params(ktime_t now)
     PARAM_UPDATE(Acceleration);
     PARAM_UPDATE(OutputCap);
     PARAM_UPDATE(Offset);
-    PARAM_UPDATE(ScrollsPerTick);
+    //PARAM_UPDATE(ScrollsPerTick);
     PARAM_UPDATE(Exponent);
     PARAM_UPDATE(Midpoint);
     PARAM_UPDATE(PreScale);
@@ -189,7 +191,7 @@ int accelerate(int *x, int *y, int *wheel)
     //Static float assignment should happen at compile-time and thus should be safe here. However, avoid non-static assignment of floats outside kernel_fpu_begin()/kernel_fpu_end()
     static FP_LONG carry_x = 0;
     static FP_LONG carry_y = 0;
-    static FP_LONG carry_whl = 0;
+    //static FP_LONG carry_whl = 0;
     static FP_LONG last_ms = One;
     static long long iter = 0;
     static ktime_t last;//, elapsed_time, highest_elapsed_time;
@@ -328,22 +330,24 @@ int accelerate(int *x, int *y, int *wheel)
                 speed = g_LutData_y[0];
             else {
                 int l = 0, r = g_LutSize - 2;
-                while (l <= r) {
+                while (l < r) {
                     int mid = (r + l) / 2;
 
                     if (speed > g_LutData_x[mid]) {
                         l = mid + 1;
-                    } else if (speed < g_LutData_x[mid])
+                    } else {
                         r = mid - 1;
-                    else {
-                        break;
                     }
                 }
 
-                FP_LONG p = g_LutData_y[r];
-                FP_LONG p1 = g_LutData_y[r + 1];
+                int index = r;
 
-                FP_LONG frac = FP64_DivPrecise(speed - g_LutData_x[r], g_LutData_x[r + 1] - g_LutData_x[r]);
+                FP_LONG p = g_LutData_y[index];
+                FP_LONG p1 = g_LutData_y[index + 1];
+
+                // denominator should not possibly ever be equal to 0 here... (we all know how this will end)
+                FP_LONG frac = FP64_DivPrecise(speed - g_LutData_x[index],
+                                               g_LutData_x[index + 1] - g_LutData_x[index]);
 
                 speed = FP64_Lerp(p, p1, frac);
             }

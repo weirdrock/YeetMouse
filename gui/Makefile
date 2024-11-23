@@ -15,7 +15,7 @@ endif
 #sudo apt-get install libusb-1.0-0-dev
 
 # Define the source files
-SOURCES = main.cpp gui.cpp DriverHelper.cpp ImGuiExtensions.cpp FunctionHelper.cpp $(wildcard External/ImGui/*.cpp) $(wildcard gui/lib/*.cpp)
+SOURCES = main.cpp gui.cpp DriverHelper.cpp ImGuiExtensions.cpp FunctionHelper.cpp ConfigHelper.cpp $(wildcard External/ImGui/*.cpp) $(wildcard gui/lib/*.cpp)
 
 # Define the object files
 OBJECTS = $(patsubst %.cpp, %.o, $(SOURCES))

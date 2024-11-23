@@ -15,6 +15,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <filesystem>
+#include <algorithm>
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
@@ -41,6 +42,8 @@ namespace DriverHelper {
 
     /// Returns the number of parsed values
     size_t ParseDriverLutData(const char* user_data, double* out_x, double* out_y);
+
+    std::string EncodeLutData(double *data_x, double *data_y, size_t size);
 
     // Handle Devices
     inline bool BindToDriver(const char* driver_name, std::string device_id) {
@@ -143,23 +146,103 @@ inline const char* interfaceProtocol2String(int interfaceProtocol, int interface
 // This is awfully slow btw.
 inline std::string decodeVendorId(const std::string& vendorId) {
     std::ifstream file("/usr/share/hwdata/usb.ids");
-    if (!file.is_open()) {
+    if (!file.is_open() || file.bad()) {
         return "Unknown";
     }
 
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.find('#') == 0) {
-            continue; // skip comments
-        }
+    try {
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.find('#') == 0) {
+                continue; // skip comments
+            }
 
-        std::string id = line;
-        if (id.find(vendorId) == 0) {
-            return line.substr(line.find("  ") + 2);
+            std::string id = line;
+            if (id.find(vendorId) == 0) {
+                return line.substr(line.find("  ") + 2);
+            }
         }
+    }
+    catch (std::exception& ex) {
+        printf("Error while decoding vendor ID: %s\n", ex.what());
+        return "Unknown";
     }
 
     return "Unknown";
+}
+
+enum AccelMode {
+    AccelMode_Current = 0,
+    AccelMode_Linear = 1,
+    AccelMode_Power = 2,
+    AccelMode_Classic = 3,
+    AccelMode_Motivity = 4,
+    AccelMode_Jump = 5,
+    AccelMode_Lut = 6,
+    AccelMode_Count,
+};
+
+inline std::string AccelMode2String(AccelMode mode) {
+    switch (mode) {
+        case AccelMode_Current:
+            return "Current";
+        case AccelMode_Linear:
+            return "Linear";
+        case AccelMode_Power:
+            return "Power";
+        case AccelMode_Classic:
+            return "Classic";
+        case AccelMode_Motivity:
+            return "Motivity";
+        case AccelMode_Jump:
+            return "Jump";
+        case AccelMode_Lut:
+            return "LUT";
+        default:
+            return "Unknown";
+    }
+}
+
+inline std::string AccelMode2String_CAPS(AccelMode mode) {
+    switch (mode) {
+        case AccelMode_Current:
+            return "CURRENT";
+        case AccelMode_Linear:
+            return "LINEAR";
+        case AccelMode_Power:
+            return "POWER";
+        case AccelMode_Classic:
+            return "CLASSIC";
+        case AccelMode_Motivity:
+            return "MOTIVITY";
+        case AccelMode_Jump:
+            return "JUMP";
+        case AccelMode_Lut:
+            return "LUT";
+        default:
+            return "Unknown";
+    }
+}
+
+inline AccelMode AccelMode_From_String(std::string mode_text) {
+    // Bring text to lowercase
+    std::transform(mode_text.begin(), mode_text.end(), mode_text.begin(),
+                   [](unsigned char c){ return std::tolower(c); });
+
+    if(mode_text == "current")
+        return AccelMode_Current;
+    else if (mode_text == "linear")
+        return AccelMode_Linear;
+    else if (mode_text == "power")
+        return AccelMode_Power;
+    else if (mode_text == "classic")
+        return AccelMode_Classic;
+    else if (mode_text == "motivity")
+        return AccelMode_Motivity;
+    else if (mode_text == "jump")
+        return AccelMode_Jump;
+    else
+        return AccelMode_Current;
 }
 
 struct Parameters {
@@ -171,8 +254,8 @@ struct Parameters {
     float exponent = 0.4f;
     float midpoint = 5.0f;
     float preScale = 1.0f;
-    float scrollAccel = 1.0f;
-    int accelMode = 0;
+    //float scrollAccel = 1.0f;
+    AccelMode accelMode = AccelMode_Current;
     bool useSmoothing = true; // true/false
     float rotation = 0; // Stored in degrees, converted to radians when writing out
 

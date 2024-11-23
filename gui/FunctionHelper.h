@@ -25,31 +25,31 @@ public:
         }
         float val = 0;
         switch (params->accelMode) {
-            case 0:
+            case AccelMode_Current:
             {
                 break;
             }
-            case 1: // Linear
+            case AccelMode_Linear: // Linear
             {
                 val = params->accel * x + 1;
                 break;
             }
-            case 2: // Power
+            case AccelMode_Power: // Power
             {
                 val = pow(x * params->accel, params->exponent);
                 break;
             }
-            case 3: // Classic
+            case AccelMode_Classic: // Classic
             {
                 val = pow(x * params->accel, params->exponent - 1) + 1;
                 break;
             }
-            case 4: // Motivity
+            case AccelMode_Motivity: // Motivity
             {
                 val = (params->accel - 1) / (1 + exp(params->midpoint - x)) + 1;
                 break;
             }
-            case 5: // Jump
+            case AccelMode_Jump: // Jump
             {
                 double exp_param = smoothness * (params->midpoint - x);
                 double D = exp(exp_param);
@@ -62,7 +62,7 @@ public:
                 }
                 break;
             }
-            case 6: // LUT
+            case AccelMode_Lut: // LUT
             {
                 if(params->LUT_size == 0)
                     break;
@@ -74,17 +74,27 @@ public:
 
                 // Binary Search for the closest value smaller than x, so the n+1 value is greater than x
                 int l = 0, r = params->LUT_size - 2;
-                while(l <= r) {
+                //while(l <= r) {
+                //    int mid = (r + l) / 2;
+                //
+                //    if(x > params->LUT_data_x[mid]) {
+                //        l = mid + 1;
+                //    }
+                //    else if(x < params->LUT_data_x[mid]) {
+                //        r = mid - 1;
+                //    }
+                //    else { // This should never happen
+                //        break;
+                //    }
+                //}
+
+                while (l < r) {
                     int mid = (r + l) / 2;
 
-                    if(x > params->LUT_data_x[mid]) {
+                    if (x > params->LUT_data_x[mid]) {
                         l = mid + 1;
-                    }
-                    else if(x < params->LUT_data_x[mid]) {
+                    } else {
                         r = mid - 1;
-                    }
-                    else { // This should never happen
-                        break;
                     }
                 }
 
@@ -96,7 +106,7 @@ public:
                 float p1 = params->LUT_data_y[(int)(pos) + 1]; // p + 1 element
 
                 // derived from this (lerp): frac * params->LUT_data_x[l + 1] + params->LUT_data_x[l] = x
-                float frac = (x-params->LUT_data_x[l]) / (params->LUT_data_x[l + 1] - params->LUT_data_x[l]);
+                float frac = (x - params->LUT_data_x[l]) / (params->LUT_data_x[l + 1] - params->LUT_data_x[l]);
 
                 //printf("frac: %f\n", frac);
 

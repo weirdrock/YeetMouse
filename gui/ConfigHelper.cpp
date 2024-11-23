@@ -1,0 +1,279 @@
+#include "ConfigHelper.h"
+#include <fstream>
+
+char* OpenFile() {
+    char* filename = new char[512];
+    char cwd[1024];
+    char command[2048] = R"(zenity --file-selection --title="Select a config file")";
+    FILE *f = nullptr;
+    if(getcwd(cwd, sizeof(cwd)) != nullptr)
+        sprintf(command, R"(zenity --file-selection --title="Select a config file" --filename="%s/")", cwd);
+
+    f = popen(command, "r");
+    auto res = fgets(filename, 512, f);
+    if(!res) {
+        delete[] filename;
+        return nullptr;
+    }
+    res[strlen(res)-1] = 0;
+
+    pclose(f);
+
+    return res;
+}
+
+char* SaveFile() {
+    char* filename = new char[512];
+    char cwd[1024];
+    char command[2048] = R"(zenity --save --file-selection --title="Save Config")";
+    FILE *f = nullptr;
+    if(getcwd(cwd, sizeof(cwd)) != nullptr)
+        sprintf(command, R"(zenity --save --file-selection --title="Save Config" --filename="%s/")", cwd);
+
+    f = popen(command, "r");
+    auto res = fgets(filename, 512, f);
+    if(!res) {
+        delete[] filename;
+        return nullptr;
+    }
+    res[strlen(res)-1] = 0;
+
+    pclose(f);
+
+    return res;
+}
+
+namespace ConfigHelper {
+
+    /*
+     *  float sens = 1.0f;
+        float outCap = 0.f;
+        float inCap = 0.f;
+        float offset = 0.0f;
+        float accel = 2.0f;
+        float exponent = 0.4f;
+        float midpoint = 5.0f;
+        float preScale = 1.0f;
+        AccelMode accelMode = AccelMode_Current;
+        bool useSmoothing = true; // true/false
+        float rotation = 0; // Stored in degrees, converted to radians when writing out
+        double LUT_data_x[MAX_LUT_ARRAY_SIZE];
+        double LUT_data_y[MAX_LUT_ARRAY_SIZE];
+        int LUT_size = 0;
+     */
+    std::string ExportPlainText(Parameters params, bool save_to_file) {
+        std::stringstream res_ss;
+
+        try {
+
+            res_ss << "sens=" << params.sens << std::endl;
+            res_ss << "outCap=" << params.outCap << std::endl;
+            res_ss << "inCap=" << params.inCap << std::endl;
+            res_ss << "offset=" << params.offset << std::endl;
+            res_ss << "accel=" << params.accel << std::endl;
+            res_ss << "exponent=" << params.exponent << std::endl;
+            res_ss << "midpoint=" << params.midpoint << std::endl;
+            res_ss << "preScale=" << params.preScale << std::endl;
+            res_ss << "accelMode=" << params.accelMode << std::endl;
+            res_ss << "useSmoothing=" << params.useSmoothing << std::endl;
+            res_ss << "rotation=" << params.rotation << std::endl;
+            res_ss << "LUT_size=" << params.LUT_size << std::endl;
+            res_ss << "LUT_data=" << DriverHelper::EncodeLutData(params.LUT_data_x, params.LUT_data_y, params.LUT_size);
+
+            if(save_to_file) {
+                auto out_path = SaveFile();
+                if (!out_path)
+                    return "";
+                std::ofstream out_file(out_path);
+
+                delete[] out_path;
+
+                if (!out_file.good())
+                    return "";
+
+                out_file << res_ss.str();
+
+                out_file.close();
+            }
+            return res_ss.str();
+        }
+        catch (std::exception& ex) {
+            printf("Failed Export: %s\n", ex.what());
+        }
+
+        return "";
+    }
+
+    std::string ExportConfig(Parameters params, bool save_to_file) {
+        try {
+            std::stringstream res_ss;
+
+            res_ss << "#define BUFFER_SIZE 16" << std::endl;
+
+            res_ss << "#define SENSITIVITY " << params.sens << std::endl;
+            res_ss << "#define OUTPUT_CAP " << params.outCap << std::endl;
+            res_ss << "#define INPUT_CAP " << params.inCap << std::endl;
+            res_ss << "#define OFFSET " << params.offset << std::endl;
+            res_ss << "#define ACCELERATION " << params.accel << std::endl;
+            res_ss << "#define EXPONENT " << params.exponent << std::endl;
+            res_ss << "#define MIDPOINT " << params.midpoint << std::endl;
+            res_ss << "#define PRESCALE " << params.preScale << std::endl;
+            res_ss << "#define ACCELERATION_MODE " << params.accelMode << std::endl;
+            res_ss << "#define USE_SMOOTHING " << params.useSmoothing << std::endl;
+            res_ss << "#define ROTATION_ANGLE " << (params.rotation * DEG2RAD) << std::endl;
+            res_ss << "#define LUT_SIZE " << params.LUT_size << std::endl;
+            res_ss << "#define LUT_DATA " << DriverHelper::EncodeLutData(params.LUT_data_x, params.LUT_data_y, params.LUT_size);
+
+            if(save_to_file) {
+                auto out_path = SaveFile();
+                if (!out_path)
+                    return "";
+                std::ofstream out_file(out_path);
+
+                delete[] out_path;
+
+                if (!out_file.good())
+                    return "";
+
+                out_file << res_ss.str();
+
+                out_file.close();
+            }
+            return res_ss.str();
+        }
+        catch (std::exception& ex) {
+            printf("Failed Export: %s\n", ex.what());
+        }
+
+        return "";
+    }
+
+#define STRING_2_LOWERCASE(s) std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c){ return std::tolower(c); });
+
+    template <typename StreamType>
+    Parameters ImportAny(StreamType& stream, char *lut_data, bool is_config_h) {
+        static_assert(std::is_base_of<std::istream, StreamType>::value, "StreamType must be derived from std::istream");
+
+        Parameters params;
+
+        std::string line;
+        int idx = 0;
+        while (getline(stream, line)) {
+            if (idx == 0 && (line.find("#define") != std::string::npos || line.find("//") != std::string::npos))
+                is_config_h = true;
+
+            if(is_config_h && line[0] == '/' && line[1] == '/')
+                continue;
+
+            std::string name;
+            std::string val_str;
+            double val = 0;
+
+            std::string part;
+            std::stringstream ss(line);
+            for (int part_idx = 0; ss >> part; part_idx++) {
+                if (is_config_h) {
+                    if (part_idx == 0)
+                        continue;
+                    else if (part_idx == 1) {
+                        name = part;
+                        STRING_2_LOWERCASE(name);
+                    } else if(part_idx == 2) {
+                        val_str = part;
+                        val = std::stod(val_str);
+                    } else
+                        continue;
+                }
+                else {
+                    name = part.substr(0, part.find('='));
+                    STRING_2_LOWERCASE(name);
+                    val_str = part.substr(part.find('=') + 1);
+                    //printf("val str = %s\n", val_str.c_str());
+                    if(!val_str.empty())
+                        val = std::stod(val_str);
+                }
+            }
+
+            if(name == "sens" || name == "sensitivity")
+                params.sens = val;
+            else if(name == "outcap" || name == "output_cap")
+                params.outCap = val;
+            else if(name == "incap" || name == "input_cap")
+                params.inCap = val;
+            else if(name == "offset" || name == "output_cap")
+                params.offset = val;
+            else if(name == "acceleration" || name == "accel")
+                params.accel = val;
+            else if(name == "exponent")
+                params.exponent = val;
+            else if(name == "midpoint" || name == "midpoint")
+                params.midpoint = val;
+            else if(name == "prescale")
+                params.preScale = val;
+            else if(name == "accelmode" || name == "acceleration_mode")
+                params.accelMode = static_cast<AccelMode>(std::clamp((int)val, 0, (int)AccelMode_Count-1));
+            else if(name == "usesmoothing" || name == "use_smoothing")
+                params.useSmoothing = val;
+            else if(name == "rotation" || name == "rotation_angle")
+                params.rotation = val / (is_config_h ? DEG2RAD : 1);
+            else if(name == "lut_size")
+                params.LUT_size = val;
+            else if(name == "lut_data") {
+                strcpy(lut_data, val_str.c_str());
+                params.LUT_size = DriverHelper::ParseUserLutData(lut_data, params.LUT_data_x, params.LUT_data_y, params.LUT_size);
+                //DriverHelper::ParseDriverLutData(lut_data, params.LUT_data_x, params.LUT_data_y);
+            }
+
+            idx++;
+        }
+
+        return params;
+    }
+
+    bool ImportFile(char *lut_data, Parameters &params) {
+        const char* filepath = OpenFile();
+
+        if(filepath == nullptr)
+            return false;
+
+        bool is_config_h = false;
+        auto file_name_len = strlen(filepath);
+        try {
+
+            is_config_h = filepath[file_name_len - 1] == 'h' && filepath[file_name_len - 2] == '.';
+
+            std::ifstream file(filepath);
+
+            delete[] filepath;
+
+            if(!file.good())
+                return {};
+
+            params = ImportAny(file, lut_data, is_config_h);
+        }
+        catch (std::exception& ex) {
+            printf("Import error: %s\n", ex.what());
+            return false;
+        }
+
+        return true;
+    }
+
+    bool ImportClipboard(char *lut_data, const char* clipboard, Parameters &params) {
+        if(clipboard == nullptr)
+            return false;
+
+        bool is_config_h = false;
+        try {
+            std::stringstream sstream(clipboard);
+
+            params = ImportAny(sstream, lut_data, is_config_h);
+        }
+        catch (std::exception& ex) {
+            printf("Import error: %s\n", ex.what());
+            return false;
+        }
+
+        return true;
+    }
+} // ConfigHelper
