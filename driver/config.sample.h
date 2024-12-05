@@ -17,6 +17,10 @@
 // Rotation (in radians)
 #define ROTATION_ANGLE 0
 
+// Angle Snapping
+#define ANGLE_SNAPPING_THRESHOLD 0 // 0 deg. in rad.
+#define ANGLE_SNAPPING_ANGLE 0 // 1.5708 - 90 deg. in rad.
+
 // LUT settings
 #define LUT_SIZE 0
 #define LUT_DATA 0
