@@ -150,12 +150,14 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
                 data[0] == D_USAGE_X ||
                 data[0] == D_USAGE_Y
             ) {
-                for(n = 0; n < r_count; n++){
-                    if(!r_usage) {
-                        printk("LEETMOUSE: OUT OF BOUNDS R/W, r_usage not yet initialized!");
-                        kfree(r_usage);
-                        return -ENODEV;
-                    }
+                if(!r_usage) {
+                    printk("LEETMOUSE: OUT OF BOUNDS R/W, r_usage not yet initialized!");
+                    kfree(r_usage);
+                    return -ENODEV;
+                }
+
+                // Set the next free spot in r_usage with current data
+                for(n = 0; n < r_max_count; n++) {
                     if(!r_usage[n]){
                         r_usage[n] = (int) data[0];
                         break;
@@ -166,7 +168,7 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
 
         // ######## Main items
         //Check, if we reached the end of this input data type
-        if(ctl == D_INPUT || ctl == D_FEATURE){
+        if(ctl == D_INPUT || ctl == D_FEATURE) {
             //Buttons are handled separately
             if(!r_usage) {
                 printk("LEETMOUSE: OUT OF BOUNDS R/W, r_usage not yet initialized!");
@@ -193,8 +195,8 @@ int parse_report_desc(unsigned char *buffer, int buffer_len, struct report_posit
 
                 }
             }
-            //Reset usages
-            for(n = 0; n < r_count; n++){
+            //Reset all usages
+            for(n = 0; n < r_max_count; n++){
                 r_usage[n] = 0;
             }
             //Increment offset
