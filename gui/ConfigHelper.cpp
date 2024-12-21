@@ -77,6 +77,8 @@ namespace ConfigHelper {
             res_ss << "accelMode=" << params.accelMode << std::endl;
             res_ss << "useSmoothing=" << params.useSmoothing << std::endl;
             res_ss << "rotation=" << params.rotation << std::endl;
+            res_ss << "as_threshold=" << params.as_threshold << std::endl;
+            res_ss << "as_angle=" << params.as_angle << std::endl;
             res_ss << "LUT_size=" << params.LUT_size << std::endl;
             res_ss << "LUT_data=" << DriverHelper::EncodeLutData(params.LUT_data_x, params.LUT_data_y, params.LUT_size);
 
@@ -121,6 +123,8 @@ namespace ConfigHelper {
             res_ss << "#define ACCELERATION_MODE " << params.accelMode << std::endl;
             res_ss << "#define USE_SMOOTHING " << params.useSmoothing << std::endl;
             res_ss << "#define ROTATION_ANGLE " << (params.rotation * DEG2RAD) << std::endl;
+            res_ss << "#define ANGLE_SNAPPING_THRESHOLD " << (params.as_threshold * DEG2RAD) << std::endl;
+            res_ss << "#define ANGLE_SNAPPING_ANGLE " << (params.as_angle * DEG2RAD) << std::endl;
             res_ss << "#define LUT_SIZE " << params.LUT_size << std::endl;
             res_ss << "#define LUT_DATA " << DriverHelper::EncodeLutData(params.LUT_data_x, params.LUT_data_y, params.LUT_size);
 
@@ -216,6 +220,10 @@ namespace ConfigHelper {
                 params.useSmoothing = val;
             else if(name == "rotation" || name == "rotation_angle")
                 params.rotation = val / (is_config_h ? DEG2RAD : 1);
+            else if(name == "as_threshold" || name == "angle_snapping_threshold")
+                params.as_threshold = val / (is_config_h ? DEG2RAD : 1);
+            else if(name == "as_angle" || name == "angle_snapping_angle")
+                params.as_angle = val / (is_config_h ? DEG2RAD : 1);
             else if(name == "lut_size")
                 params.LUT_size = val;
             else if(name == "lut_data") {
