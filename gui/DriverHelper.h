@@ -258,6 +258,8 @@ struct Parameters {
     AccelMode accelMode = AccelMode_Current;
     bool useSmoothing = true; // true/false
     float rotation = 0; // Stored in degrees, converted to radians when writing out
+    float as_threshold = 0; // Stored in degrees, converted to radians when writing out
+    float as_angle = 0; // Stored in degrees, converted to radians when writing out
 
     /// The issue of performance with LUT is currently solved with a fixed stride, but another approach would be to
     /// store separately x and y values, sort both by x values, and do a binary search every time you want to find points.

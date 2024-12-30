@@ -10,7 +10,10 @@
 //#define USE_INPUT_DRAG
 
 /* TODO
- * - Config export/import (from and to clipboard) in a human readable format or config.h
+ * + Config export/import (from and to clipboard) in a human readable format or config.h
+ * - Anisotropy
+ * + Angle snapping
+ * - Fully customizable curves (from polynomials)
  */
 
 AccelMode selected_mode = AccelMode_Linear;
@@ -154,14 +157,12 @@ int OnGui() {
                 change |= ImGui::DragFloat("##Adv_Rotation", &params[selected_mode].rotation, 0.1, 0, 180,
                                                 u8"Rotation Angle %0.2f°");
         #else
-                change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 10, "Sensitivity %0.2f");
+                change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity %.3f");
                 change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 100, "Output Cap. %0.2f");
                 change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
                 change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
                 change |= ImGui::SliderFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 10, "Pre-Scale %0.2f");
                 ImGui::SetItemTooltip("Used to adjust for different DPI values (Set to 800/DPI)");
-                change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, 0, 180,
-                                             u8"Rotation Angle %0.2f°");
         #endif
 
                 ImGui::SeparatorText("Advanced");
@@ -257,6 +258,16 @@ int OnGui() {
                 }
                 ImGui::PopID();
 
+                ImGui::SeparatorText("Rotation");
+                change |= ImGui::SliderFloat("##Adv_AS_Threshold", &params[selected_mode].as_threshold, 0, 179.99,
+                                             u8"Snapping Threshold %0.2f°");
+                change |= ImGui::SliderFloat("##Adv_AS_Angle", &params[selected_mode].as_angle, 0, 179.99,
+                                             u8"Snapping Angle %0.2f°");
+                change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, 0, 180,
+                                             u8"Rotation Angle %0.2f°");
+                if(params[selected_mode].as_threshold > 0)
+                    ImGui::SetItemTooltip("Rotation is applied after Angle Snapping");
+
                 if(change)
                     functions[selected_mode].PreCacheFunc();
 
@@ -310,7 +321,7 @@ int OnGui() {
                 float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
                 //mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 100;
                 //float dt = fmaxf(ImGui::GetIO().DeltaTime, 0.003);
-                mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 1000;
+                mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 1000 / params[0].sens;
                 if(mouse_speed > recent_mouse_top_speed) {
                     recent_mouse_top_speed = mouse_speed;
                     last_time_speed_record_broken = steady_clock::now();
@@ -654,6 +665,10 @@ int main() {
         DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
         DriverHelper::GetParameterF("RotationAngle", start_params.rotation);
         start_params.rotation /= DEG2RAD;
+        DriverHelper::GetParameterF("AngleSnap_Threshold", start_params.as_threshold);
+        start_params.as_threshold /= DEG2RAD;
+        DriverHelper::GetParameterF("AngleSnap_Angle", start_params.as_angle);
+        start_params.as_angle /= DEG2RAD;
         //DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
         std::string Lut_dataBuf;
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);
