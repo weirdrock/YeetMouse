@@ -320,6 +320,7 @@ bool Parameters::SaveAll() {
 
     // General
     res &= SetParameterTy("Sensitivity", sens);
+    res &= SetParameterTy("SensitivityY", use_anisotropy ? sensY : sens);
     res &= SetParameterTy("OutputCap", outCap);
     res &= SetParameterTy("InputCap", inCap);
     res &= SetParameterTy("Offset", offset);

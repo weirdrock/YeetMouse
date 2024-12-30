@@ -247,6 +247,7 @@ inline AccelMode AccelMode_From_String(std::string mode_text) {
 
 struct Parameters {
     float sens = 1.0f;
+    float sensY = 1.0f;
     float outCap = 0.f;
     float inCap = 0.f;
     float offset = 0.0f;
@@ -270,6 +271,8 @@ struct Parameters {
     int LUT_size = 0;
 
     Parameters() = default;
+
+    bool use_anisotropy = false;
 
     //Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent, float midpoint,
     //           float scrollAccel, int accelMode);

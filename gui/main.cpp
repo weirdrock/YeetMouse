@@ -11,9 +11,10 @@
 
 /* TODO
  * + Config export/import (from and to clipboard) in a human readable format or config.h
- * - Anisotropy
+ * + Anisotropy
  * + Angle snapping
  * - Fully customizable curves (from polynomials)
+ * - Clean up the parameter formatting to allow for different precisions
  */
 
 AccelMode selected_mode = AccelMode_Linear;
@@ -146,6 +147,9 @@ int OnGui() {
 
                 bool change = false;
 
+                ImGui::Checkbox("Use anisotropy", &params[selected_mode].use_anisotropy);
+                ImGui::SetItemTooltip("Separate X/Y sensitivity values");
+
                 // Display Global Parameters First
         #ifdef USE_INPUT_DRAG
                 change |= ImGui::DragFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 0.01, 10, "Sensitivity %0.2f");
@@ -157,7 +161,12 @@ int OnGui() {
                 change |= ImGui::DragFloat("##Adv_Rotation", &params[selected_mode].rotation, 0.1, 0, 180,
                                                 u8"Rotation Angle %0.2f°");
         #else
-                change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity %.3f");
+                if (params[selected_mode].use_anisotropy) {
+                    change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity X %.3f");
+                    change |= ImGui::SliderFloat("##SensY_Param", &params[selected_mode].sensY, 0.005, 5, "Sensitivity Y %.3f");
+                }
+                else
+                    change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity %.3f");
                 change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 100, "Output Cap. %0.2f");
                 change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
                 change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
@@ -350,6 +359,10 @@ int OnGui() {
                     ImPlot::PlotLine("Function in use", functions[0].values, PLOT_POINTS, functions[0].x_stride);
                 }
 
+                if (params[selected_mode].use_anisotropy) {
+                    ImPlot::SetNextLineStyle(ImVec4(0.3, 0.3, 0.8, 1), 2);
+                    ImPlot::PlotLine("Active Mode Y##ActivePlotY", functions[selected_mode].values_y, PLOT_POINTS, functions[selected_mode].x_stride);
+                }
                 ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, 2);
                 ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS, functions[selected_mode].x_stride);
 
@@ -649,6 +662,7 @@ int main() {
     else {
         // Read driver parameters to a dummy aggregate
         DriverHelper::GetParameterF("Sensitivity", start_params.sens);
+        DriverHelper::GetParameterF("SensitivityY", start_params.sensY);
         DriverHelper::GetParameterF("OutputCap", start_params.outCap);
         DriverHelper::GetParameterF("InputCap", start_params.inCap);
         DriverHelper::GetParameterF("Offset", start_params.offset);
@@ -670,6 +684,8 @@ int main() {
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);
         Lut_dataBuf.copy(LUT_user_data, sizeof(LUT_user_data), 0);
         DriverHelper::ParseDriverLutData(Lut_dataBuf.c_str(), start_params.LUT_data_x, start_params.LUT_data_y);
+
+        start_params.use_anisotropy = start_params.sensY != start_params.sens;
 
         used_mode = start_params.accelMode;
 

@@ -4,6 +4,7 @@
 
 // There values are just here to allow you to comfortably start the GUI and change them to your preferences.
 #define SENSITIVITY 1 //0.85f
+#define SENSITIVITY_Y 1
 #define ACCELERATION 0.15
 #define OUTPUT_CAP 0
 #define OFFSET 0

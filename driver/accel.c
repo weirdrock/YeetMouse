@@ -54,6 +54,7 @@ PARAM(AccelerationMode, ACCELERATION_MODE,  "Sets the algorithm to be used for a
 // Acceleration parameters (type pchar. Converted to float via "update_params" triggered by /sys/module/leetmouse/parameters/update)
 PARAM_F(InputCap,       INPUT_CAP,          "Limit the maximum pointer speed before applying acceleration.");
 PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity.");
+PARAM_F(SensitivityY,   SENSITIVITY_Y,      "Mouse base sensitivity in the Y axis.");
 PARAM_F(Acceleration,   ACCELERATION,       "Mouse acceleration sensitivity.");
 PARAM_F(OutputCap,      OUTPUT_CAP,         "Cap maximum sensitivity.");
 PARAM_F(Offset,         OFFSET,             "Mouse base sensitivity.");
@@ -155,6 +156,7 @@ INLINE void update_params(ktime_t now)
 
     PARAM_UPDATE(InputCap);
     PARAM_UPDATE(Sensitivity);
+    PARAM_UPDATE(SensitivityY);
     PARAM_UPDATE(Acceleration);
     PARAM_UPDATE(OutputCap);
     PARAM_UPDATE(Offset);
@@ -382,18 +384,31 @@ int accelerate(int *x, int *y, int *wheel)
 
     // Actually apply accelerated sensitivity, allow post-scaling and apply carry from previous round
     // Like RawAccel, sensitivity will be a final multiplier:
-    if(g_Sensitivity != FP64_1)
+    if (g_Sensitivity == g_SensitivityY) {
+        if(g_Sensitivity != FP64_1)
+            speed = FP64_Mul(speed, g_Sensitivity);
+
+        // Apply Output Limit
+        if(g_OutputCap > 0)
+            speed = FP64_Min(g_OutputCap, speed);
+
+        // Apply acceleration
+        delta_x = FP64_Mul(delta_x, speed);
+        delta_y = FP64_Mul(delta_y, speed);
+    } else {
         speed = FP64_Mul(speed, g_Sensitivity);
+        FP_LONG speed_Y = FP64_Mul(speed, g_SensitivityY);
 
-    // Apply Output Limit
-    if(g_OutputCap > 0)
-        speed = FP64_Min(g_OutputCap, speed);
+        // Apply Output Limit
+        if(g_OutputCap > 0) {
+            speed = FP64_Min(g_OutputCap, speed);
+            speed_Y = FP64_Min(g_OutputCap, speed_Y);
+        }
 
-    // Apply acceleration
-    delta_x = FP64_Mul(delta_x, speed);
-    delta_y = FP64_Mul(delta_y, speed);
-    //delta_x *= speed;
-    //delta_y *= speed;
+        // Apply acceleration
+        delta_x = FP64_Mul(delta_x, speed);
+        delta_y = FP64_Mul(delta_y, speed_Y);
+    }
 
     // Angle Snapping
     if(modesConst.as_half_threshold != 0) {

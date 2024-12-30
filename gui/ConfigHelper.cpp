@@ -67,6 +67,7 @@ namespace ConfigHelper {
         try {
 
             res_ss << "sens=" << params.sens << std::endl;
+            res_ss << "sens_Y=" << params.sensY << std::endl;
             res_ss << "outCap=" << params.outCap << std::endl;
             res_ss << "inCap=" << params.inCap << std::endl;
             res_ss << "offset=" << params.offset << std::endl;
@@ -113,6 +114,7 @@ namespace ConfigHelper {
             res_ss << "#define BUFFER_SIZE 16" << std::endl;
 
             res_ss << "#define SENSITIVITY " << params.sens << std::endl;
+            res_ss << "#define SENSITIVITY_Y " << params.sensY << std::endl;
             res_ss << "#define OUTPUT_CAP " << params.outCap << std::endl;
             res_ss << "#define INPUT_CAP " << params.inCap << std::endl;
             res_ss << "#define OFFSET " << params.offset << std::endl;
@@ -200,6 +202,10 @@ namespace ConfigHelper {
 
             if(name == "sens" || name == "sensitivity")
                 params.sens = val;
+            else if(name == "sens_y" || name == "sensitivity_y") {
+                params.sensY = val;
+                params.use_anisotropy = params.sensY != params.sens;
+            }
             else if(name == "outcap" || name == "output_cap")
                 params.outCap = val;
             else if(name == "incap" || name == "input_cap")

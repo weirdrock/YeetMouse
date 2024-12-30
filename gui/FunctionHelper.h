@@ -11,6 +11,7 @@
 class CachedFunction {
 public:
     float values[PLOT_POINTS]{0};
+    float values_y[PLOT_POINTS]{0};
     float x_stride = 0;
     Parameters* params;
 
