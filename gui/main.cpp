@@ -246,8 +246,7 @@ int OnGui() {
                             params[selected_mode].LUT_size = DriverHelper::ParseUserLutData(LUT_user_data,
                                                                                             params[selected_mode].LUT_data_x,
                                                                                             params[selected_mode].LUT_data_y,
-                                                                                            sizeof(params[selected_mode].LUT_data_x) /
-                                                                                            sizeof(params[selected_mode].LUT_data_x[0]));
+                                                                                            std::size(params[selected_mode].LUT_data_x));
                         }
                         break;
                     }
@@ -263,7 +262,7 @@ int OnGui() {
                                              u8"Snapping Threshold %0.2f°");
                 change |= ImGui::SliderFloat("##Adv_AS_Angle", &params[selected_mode].as_angle, 0, 179.99,
                                              u8"Snapping Angle %0.2f°");
-                change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, 0, 180,
+                change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, -180, 180,
                                              u8"Rotation Angle %0.2f°");
                 if(params[selected_mode].as_threshold > 0)
                     ImGui::SetItemTooltip("Rotation is applied after Angle Snapping");
@@ -337,9 +336,8 @@ int OnGui() {
 
                 last_frame_speed = avg_speed;
 
-                bool is_record_old = duration_cast<milliseconds>(steady_clock::now() - last_time_speed_record_broken).count() > 1000;
-
-                if(is_record_old)
+                // Check if a second passed since the last highest mouse speed, if so reset the record speed dot
+                if(duration_cast<milliseconds>(steady_clock::now() - last_time_speed_record_broken).count() > 1000)
                     recent_mouse_top_speed = 0;
 
                 ImPlotPoint mousePoint_topSpeed = ImPlotPoint(recent_mouse_top_speed, recent_mouse_top_speed < params[selected_mode].offset ?
@@ -426,13 +424,12 @@ int OnGui() {
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {12, 12});
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
             if(ImGui::BeginChild("Devices", ImVec2(420, 0), ImGuiChildFlags_FrameStyle | ImGuiChildFlags_ResizeX)) {
-                auto avail = ImGui::GetContentRegionAvail();
                 ImGui::PopStyleColor();
 
                 ImGui::SeparatorText("Device Selection");
 
                 for (int i = 0; i < devices.size(); i++) {
-                    auto dev = devices[i];
+                    const auto& dev = devices[i];
                     ImGui::PushID(i);
                     if (ImGui::ModeSelectable(dev.name.c_str(), i == selected_device, 0, {-1, 0}))
                         selected_device = i;
@@ -455,7 +452,6 @@ int OnGui() {
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {10, 10});
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
             if(ImGui::BeginChild("Device_Parameters", ImVec2(320, -1), ImGuiChildFlags_FrameStyle | ImGuiChildFlags_ResizeX)) {
-                auto avail = ImGui::GetContentRegionAvail();
                 ImGui::PopStyleColor();
 
                 ImGui::SeparatorText("Device Parameters");
