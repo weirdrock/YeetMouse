@@ -630,7 +630,10 @@ void ResetParameters(void) {
 
         functions[mode] = CachedFunction(((float)PLOT_X_RANGE) / PLOT_POINTS, &params[mode]);
         //printf("stride = %f\n", functions[mode].x_stride);
+        bool old_use_ani = functions[mode].params->use_anisotropy;
+        functions[mode].params->use_anisotropy = true;
         functions[mode].PreCacheFunc();
+        functions[mode].params->use_anisotropy = old_use_ani;
     }
 }
 

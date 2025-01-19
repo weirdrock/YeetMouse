@@ -53,11 +53,11 @@ PARAM(AccelerationMode, ACCELERATION_MODE,  "Sets the algorithm to be used for a
 
 // Acceleration parameters (type pchar. Converted to float via "update_params" triggered by /sys/module/leetmouse/parameters/update)
 PARAM_F(InputCap,       INPUT_CAP,          "Limit the maximum pointer speed before applying acceleration.");
-PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity.");
-PARAM_F(SensitivityY,   SENSITIVITY_Y,      "Mouse base sensitivity in the Y axis.");
+PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity, or X axis sensitivity if the anisotropy is on."); // Sensitivity for X axis only if sens != sens_y (anisotropy is on), otherwise sensitivity for both axes
+PARAM_F(SensitivityY,   SENSITIVITY_Y,      "Mouse base sensitivity on the Y axis."); // Used only when anisotropy is on
 PARAM_F(Acceleration,   ACCELERATION,       "Mouse acceleration sensitivity.");
 PARAM_F(OutputCap,      OUTPUT_CAP,         "Cap maximum sensitivity.");
-PARAM_F(Offset,         OFFSET,             "Mouse base sensitivity.");
+PARAM_F(Offset,         OFFSET,             "Mouse acceleration shift.");
 
 PARAM_F(Exponent,       EXPONENT,           "Exponent for algorithms that use it");
 PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function");

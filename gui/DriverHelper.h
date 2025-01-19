@@ -246,8 +246,8 @@ inline AccelMode AccelMode_From_String(std::string mode_text) {
 }
 
 struct Parameters {
-    float sens = 1.0f;
-    float sensY = 1.0f;
+    float sens = 1.0f; // Sensitivity for X axis only if sens != sensY (anisotropy is on), otherwise sensitivity for both axes
+    float sensY = 1.0f; // Unused when anisotropy is off (sens == sensY)
     float outCap = 0.f;
     float inCap = 0.f;
     float offset = 0.0f;
@@ -272,7 +272,8 @@ struct Parameters {
 
     Parameters() = default;
 
-    bool use_anisotropy = false;
+    bool use_anisotropy = false; // This parameter is not saved anywhere, it's just a helper.
+    // Anisotropy is on if sensY != sens, off otherwise.
 
     //Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent, float midpoint,
     //           float scrollAccel, int accelMode);
