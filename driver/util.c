@@ -279,14 +279,14 @@ inline int extract_at(unsigned char *data, int data_len, struct report_entry *en
 
     if(entry->size <= 8){
         buffer.raw[0] &= 0xFF >> (8 - entry->size);         //Zero MSB bits, if entry->size < 8
-        if(entry->sgn)                                      //If the initial value was signed and if it was not exactly of size 8, we need to add the missing sign-bits, which have been masked above with zeros.
+        if(entry->sgn && entry->size <= 7)                                      //If the initial value was signed and if it was not exactly of size 8, we need to add the missing sign-bits, which have been masked above with zeros.
             buffer.raw[0] = buffer.raw[0] >> (8 - entry->size - 1) == 0 ? buffer.raw[0] : (0xFF ^ (0xFF >> (8 - entry->size))) | buffer.raw[0];
         
         return (int) (entry->sgn ? buffer.s8 : buffer.u8);
     }
     if(entry->size <= 16){
         buffer.raw[1] &= 0xFF >> (16 - entry->size);        //Zero MSB bits, if entry->size < 16
-        if(entry->sgn)                                      //If the initial value was signed and if it was not exactly of size 16, we need to add the missing sign-bits, which have been masked above with zeros.
+        if(entry->sgn && entry->size <= 15)                                      //If the initial value was signed and if it was not exactly of size 16, we need to add the missing sign-bits, which have been masked above with zeros.
             buffer.raw[1] = buffer.raw[1] >> (16 - entry->size - 1) == 0 ? buffer.raw[1] : (0xFF ^ (0xFF >> (16 - entry->size))) | buffer.raw[1];
 
         buffer.u16 = le16_to_cpu(buffer.u16);               //Convert to machine units
