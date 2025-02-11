@@ -623,7 +623,7 @@ void ResetParameters(void) {
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 5), 2.1);
 
         if(mode == 5)
-            params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.1);
+            params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.01);
 
         if(mode == 2)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.1);

@@ -77,6 +77,7 @@ FP_LONG g_LutData_x[MAX_LUT_ARRAY_SIZE]; // Array to store the x-values of the L
 FP_LONG g_LutData_y[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
 
 #define FP64_ONE 4294967296ll
+#define EXP_ARG_THRESHOLD 16ll
 
 // Converts given string to a unsigned long
 unsigned long atoul(const char *str) {
@@ -135,7 +136,13 @@ static void update_constants(void) {
 
     // Jump
     modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
-    modesConst.C0 = FP64_DivPrecise(FP64_Mul(modesConst.accel_sub_1, FP64_Log(FP64_Add(1, FP64_Exp(FP64_Mul(modesConst.r, g_Midpoint))))), modesConst.r);
+    FP_LONG r_times_m = FP64_Mul(modesConst.r, g_Midpoint);
+
+    // Safely exponentiate without overflow (ln(1+exp(x)) when x -> 'inf' = ln(exp(x)) = x. (in practice works for x >= 8))
+    if (r_times_m < (EXP_ARG_THRESHOLD << FP64_Shift))
+        modesConst.C0 = FP64_Mul(FP64_DivPrecise(FP64_Log(FP64_Add(1, FP64_Exp(r_times_m))), modesConst.r), modesConst.accel_sub_1);
+    else
+        modesConst.C0 = FP64_Mul(modesConst.accel_sub_1, g_Midpoint);
 
     // Rotation (precalculate the trig. functions)
     modesConst.sin_a = FP64_Sin(g_RotationAngle);
@@ -144,6 +151,8 @@ static void update_constants(void) {
     modesConst.as_cos = FP64_Cos(g_AngleSnap_Angle);
     modesConst.as_sin = FP64_Sin(g_AngleSnap_Angle);
     modesConst.as_half_threshold = FP64_DivPrecise(g_AngleSnap_Threshold, 2ll << FP64_Shift);
+
+    modesConst.is_init = true;
 }
 
 static ktime_t g_next_update = 0;
@@ -153,6 +162,8 @@ INLINE void update_params(ktime_t now)
     if(now < g_next_update) return;
     g_update = 0;
     g_next_update = now + 1000000000ll;    //Next update is allowed after 1s of delay
+
+    modesConst.is_init = false;
 
     PARAM_UPDATE(InputCap);
     PARAM_UPDATE(Sensitivity);
@@ -332,10 +343,12 @@ int accelerate(int *x, int *y, int *wheel)
             // Jump: Acceleration / (1 + exp(r(midpoint - x))) + 1
             // Smooth: Integral of the above divided by x pretty much
 
-            FP_LONG D = FP64_ExpFast(FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed)));
+            FP_LONG exp_arg = FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed));
+            FP_LONG D = FP64_ExpFast(exp_arg);
 
             if(g_UseSmoothing) { // smooth
-                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(FP64_LogFast(FP64_Add(FP64_1, D)), modesConst.r)));
+                FP_LONG natural_log = exp_arg > (EXP_ARG_THRESHOLD << FP64_Shift) ? exp_arg : FP64_LogFast(FP64_Add(FP64_1, D));
+                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(natural_log, modesConst.r)));
                 // Not really an integral
                 speed = FP64_Add(FP64_DivPrecise(FP64_Sub(integral, modesConst.C0), speed), FP64_1);
             }

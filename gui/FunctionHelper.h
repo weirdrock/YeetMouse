@@ -52,6 +52,7 @@ public:
             }
             case AccelMode_Jump: // Jump
             {
+                // Might cause issues with high exponent's argument values
                 double exp_param = smoothness * (params->midpoint - x);
                 double D = exp(exp_param);
                 if(params->useSmoothing) {

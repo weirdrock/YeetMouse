@@ -136,16 +136,16 @@ static FP_INT FP64_RoundToInt(FP_LONG v) {
 /// <summary>
 /// Converts a fixed-point value into a double.
 /// </summary>
-static double FP64_ToDouble(FP_LONG v) {
-    return (double) v * (1.0 / 4294967296.0);
-}
+// static double FP64_ToDouble(FP_LONG v) {
+//     return (double) v * (1.0 / 4294967296.0);
+// }
 
 /// <summary>
 /// Converts a FP value into a float.
 /// </summary>
-static float FP64_ToFloat(FP_LONG v) {
-    return (float) v * (1.0f / 4294967296.0f);
-}
+// static float FP64_ToFloat(FP_LONG v) {
+//     return (float) v * (1.0f / 4294967296.0f);
+// }
 
 /// <summary>
 /// Converts the value to a human readable string.
