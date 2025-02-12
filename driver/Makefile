@@ -1,6 +1,14 @@
 obj-m += leetmouse.o
 leetmouse-objs := accel.o usbmouse.o util.o
 
+# Detect architecture
+ARCH := $(shell uname -m)
+
+# Architecture-specific flags
+ifeq ($(ARCH), ppc64le)
+    EXTRA_CFLAGS += -D__ppc64le__
+endif
+
 #ccflags-y += -mhard-float
 
 all:

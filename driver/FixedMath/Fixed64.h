@@ -308,12 +308,28 @@ static FP_INT FP64_Nlz(FP_ULONG x) {
 // Divides a 128 bit int (u1:u0) by a 64 bit int (v)
 static FP_LONG Div128_64(FP_LONG u1, FP_LONG u0, FP_LONG v) {
     FP_LONG result;
+#if defined (__ppc64le__)
+    FP_LONG result_2;
+    __asm__ ( // left part
+         //"cqto\n\t"
+        "divde %0, %1, %2"
+        : "=r"(result)
+        : "r"(u1), "r"(v)
+    );
+    __asm__( // right part
+      //"cqto\n\t"
+      "divd %0, %1, %2"
+      : "=r"(result_2)
+      : "r"(u0), "r"(v));
+    return result + result_2;
+#else
     uint64_t remainder;
     __asm__ (
             //"cqto\n\t"
             "idivq %[v]" : "=a"(result), "=d"(remainder) : [v] "r"(v), "a"(u0), "d"(u1)
     );
     return result;
+#endif
 }
 
 /// <summary>
