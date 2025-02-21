@@ -1,14 +1,14 @@
 * Description
-  The =LEETMOUSE= kernel module enables different acceleration modes for your mouse on Linux.
-  =LEETMOUSE= basically fuses the original [[https://github.com/torvalds/linux/blob/master/drivers/hid/usbhid/usbmouse.c][Linux USB mouse driver]] code with the acceleration code-base and has been initially developed by [[https://github.com/chilliams][Christopher Williams]].
-  Since the [[https://github.com/chilliams/mousedriver][original work]] was in a rough state and seem to have been abandoned, this fork has been started.
+  *YeetMouse* is a kernel module that allows for fast and customizable mouse acceleration.
+  I created *YeetMouse* to build upon the great work of /Klaus Zipfel's/ *[[https://github.com/systemofapwne/leetmouse][LeetMouse]]* and add features such as =Jump= (at first it was mostly it, the Jump acceleration mode).
+  But it quickly grew into something bigger as I decided to add a GUI to it for better control.
 
   #+CAPTION: Basic functions presentation
    [[media/YeetMouseGithub.gif]]
 
 * Installation & Uninstallation
 ** Preparation & Configuration
-   + Clone this repository, copy =driver/config.sample.h= to =/driver/config.h= and edit it in your favorite text editor. Change the defines in the config.h to match your desired acceleration settings. To find the settings you're most comfortable with, use the GUI.
+   + Clone this repository, find the settings you're most comfortable with, using GUI, change the defines in the config.h (More on this in the [[https://github.com/AndyFilter/YeetMouse?tab=readme-ov-file#settings-are-not-preserved-between-reboots][FAQ]] section about persistent settings).
    + Make sure, you have the required toolchains (e.g. =base-devel= on Arch or =build-essentials= on Debian) installed as well as the =linux-headers= for your installed kernel.
 
 ** Running the GUI
@@ -28,7 +28,7 @@
    To run, simply use =sudo -E ./YeetMouseGui=
 
 ** Arch/Manjaro
-   Since the maintainer of =LEETMOUSE= is an Arch and Manjaro user, a =PKGBUILD= has been written for seamless integration into pacman.
+   For Arch and Manjaro, a =PKGBUILD= has been written for seamless integration into pacman.
 
    *Installation*
    #+begin_src sh
@@ -45,12 +45,15 @@
    #+end_src
    All your mice should now be bound to the generic usbhid driver again.
 
+** Ubuntu (tested on 24.04 and 20.04)
+  Simply use the installation and uninstallation scripts, =sudo ./install.sh= and =sudo ./uninstall.sh= respectively.
+  If something doesn't work as expected, try installing manually as stated in section *Other distros*, and check all the error logs.
+
 ** NixOS
   Please refer to [[nix/][NixOS instructions]].
    
 ** Other distros
-   Other distributions' package-managers are not yet supported and thus need a manual installation. However Debian based systems are planned.
-   The installation is not yet very polished but eventually will become so.
+   Other distributions' package-managers are not yet supported and thus need a manual installation.
    
    *Installation*
 
@@ -91,7 +94,33 @@
    If you did not install the udev rules before via =sudo make udev_install= you need to manually bind your mouse to this driver.
    You can take a look at =/scripts/bind.sh= for an example on how to determine your mouse's USB address for that. However using the udev rules for development is advised.
 
-* Fixed-Point Analysis
+* FAQ
+*** How to set custom parameter value?
+- Ctrl + Left Click on the parameter box to start inputting the values manually.
+
+
+*** Settings are not preserved between reboots
+- This is (unfortunately) how things are done on most distros, for security reasons I presume.
+  But there is a way so save the settings. All You need to do is find the values You like and Export them to a config.h format like so:
+  #+CAPTION: Exporting config to a .h format
+  [[https://private-user-images.githubusercontent.com/69699046/397979220-ad0fc1a9-5616-4b41-b453-7398dbb9993c.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mzk4MDA4ODksIm5iZiI6MTczOTgwMDU4OSwicGF0aCI6Ii82OTY5OTA0Ni8zOTc5NzkyMjAtYWQwZmMxYTktNTYxNi00YjQxLWI0NTMtNzM5OGRiYjk5OTNjLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTAyMTclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwMjE3VDEzNTYyOVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTg2YTg0YjI1OTAxMDAwMDUxOWQ0YzNhMzExZmM5NWQ5MzQ3NWE4YjQ4YzcxMTNlYWUyNTE1ZTYzMjMyMGU1M2MmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.bhGe7Igfl56zRPajmUchH2ppTpsGfuD1DyXWjYttQzo]]
+
+  Then simply replace the =config.h= file located in =/driver= (or create a one), and reinstall the driver.
+
+*** Mouse feels off (too fast / slow)
+- On some distros (for example Ubuntu 20.04) system adds an additional sensitivity on top of the driver. To combat this You'll need to configure the settings correctly.
+  This is system dependant, but for Ubuntu 20.04 users, the exact sensitivity value is -0.666, to apply that, simply use =gsettings set org.gnome.desktop.peripherals.mouse speed -0.666=
+
+
+*** How do I convert my RawAccel settings?
+- For the simple modes like /Linear, Classic, Power/ just use the RawAccel's values (same for /Jump/).
+- For /Motivity/ and /Natural/, You're out of luck for now. Motivity is implemented, but it does not support =Gain=. Natural on the other hand is not implemented, and not planned as of for now.
+- LuT (Look up Table) is just what you put in it, there is no difference between YeetMouse and RawAccel.
+- Keep in mind that the names are not 1:1 for every parameter.
+- To check how Your new curve compares to RawAccel's, just take a screenshot of RawAccel with your curve and compare the two.
+
+
+* Fixed-Point Performance Analysis
   #+CAPTION: Functions Performance Comparison
    [[media/InstructionPerformance.png]]
 
@@ -223,17 +252,3 @@
 #+END_HTML
 
 **** /More in-depth performance and precision analysis can be found [[Performance.md][here]]/.
-
-* TODOS
-  | AUR package release                                                | Once it reaches version 1.0 (basically after Im happy with it)     |
-  | dpkg package for Debian based systems                              | After AUR release                                                  |
-  | Feature parity with Povohats driver and later even RawAccel        | When I find time - Definitely after above milestones               |
-  | Optimize some Fixed-Point functions                                | Done                                                               |
-  | GUI to configure the acceleration parameters                       | Done                                                               |
-  | Move to Fixed-Point arithmetic                                     | Done                                                               |
-  | External interface for dynamically pushing acceleration parameters | Done                                                               |
-  | Fixing the only [[https://github.com/systemofapwne/mousedriver/issues/2][vertical scrolling bug]]                                       | Done                                                               |
-  | Easier installation & binding                                      | Done                                                               |
-  | DKMS support                                                       | Done                                                               |
-  | PKGBUILD for Arch based systems                                    | Done                                                               |
-  

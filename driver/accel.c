@@ -53,10 +53,11 @@ PARAM(AccelerationMode, ACCELERATION_MODE,  "Sets the algorithm to be used for a
 
 // Acceleration parameters (type pchar. Converted to float via "update_params" triggered by /sys/module/leetmouse/parameters/update)
 PARAM_F(InputCap,       INPUT_CAP,          "Limit the maximum pointer speed before applying acceleration.");
-PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity.");
+PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity, or X axis sensitivity if the anisotropy is on."); // Sensitivity for X axis only if sens != sens_y (anisotropy is on), otherwise sensitivity for both axes
+PARAM_F(SensitivityY,   SENSITIVITY_Y,      "Mouse base sensitivity on the Y axis."); // Used only when anisotropy is on
 PARAM_F(Acceleration,   ACCELERATION,       "Mouse acceleration sensitivity.");
 PARAM_F(OutputCap,      OUTPUT_CAP,         "Cap maximum sensitivity.");
-PARAM_F(Offset,         OFFSET,             "Mouse base sensitivity.");
+PARAM_F(Offset,         OFFSET,             "Mouse acceleration shift.");
 
 PARAM_F(Exponent,       EXPONENT,           "Exponent for algorithms that use it");
 PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function");
@@ -69,11 +70,14 @@ PARAM_UL(LutSize,       LUT_SIZE,           "LUT data array size");
 PARAM_ARR(LutDataBuf,   LUT_DATA,           "Data of the LUT stored in a human form"); // g_LutDataBuf should not be used!
 
 PARAM_F(RotationAngle, ROTATION_ANGLE,      "Amount of clockwise rotation (in radians)");
+PARAM_F(AngleSnap_Threshold, ANGLE_SNAPPING_THRESHOLD,      "Rotation value at which angle snapping is triggered (in radians)");
+PARAM_F(AngleSnap_Angle, ANGLE_SNAPPING_ANGLE,      "Amount of clockwise rotation for angle snapping (in radians)");
 
 FP_LONG g_LutData_x[MAX_LUT_ARRAY_SIZE]; // Array to store the x-values of the LUT data
 FP_LONG g_LutData_y[MAX_LUT_ARRAY_SIZE]; // Array to store the y-values of the LUT data
 
 #define FP64_ONE 4294967296ll
+#define EXP_ARG_THRESHOLD 16ll
 
 // Converts given string to a unsigned long
 unsigned long atoul(const char *str) {
@@ -95,6 +99,16 @@ unsigned long atoul(const char *str) {
 #define PARAM_UPDATE(param) (FP64_FromString(g_param_##param, &g_##param))
 #define PARAM_UPDATE_UL(param) (atoul(g_param_##param))
 
+const FP_LONG FP64_PI = C0NST_FP64_FromDouble(3.14159);
+const FP_LONG FP64_PI_2 = C0NST_FP64_FromDouble(1.57079);
+const FP_LONG FP64_PI_4 = C0NST_FP64_FromDouble(0.78539);
+const FP_LONG FP64_0_1     = 429496736;
+const FP_LONG FP64_1    = 1ll << FP64_Shift;
+const FP_LONG FP64_10      = 10ll << FP64_Shift;
+const FP_LONG FP64_100     = 100ll << FP64_Shift;
+const FP_LONG FP64_1000    = 1000ll << FP64_Shift;
+const FP_LONG FP64_10000    = 10000ll << FP64_Shift;
+
 // Aggregate values that don't change with speed to save on calculations done every irq
 struct ModesConstants {
     bool is_init;
@@ -108,7 +122,11 @@ struct ModesConstants {
 
     // Rotation
     FP_LONG sin_a, cos_a;
-} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0 };
+
+    // Angle Snapping
+    FP_LONG as_sin, as_cos;
+    FP_LONG as_half_threshold;
+} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0, .as_cos = 0, .as_sin = 0, .as_half_threshold = 0 };
 
 // Recalculate new modes constants
 static void update_constants(void) {
@@ -118,11 +136,23 @@ static void update_constants(void) {
 
     // Jump
     modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
-    modesConst.C0 = FP64_DivPrecise(FP64_Mul(modesConst.accel_sub_1, FP64_Log(FP64_Add(1, FP64_Exp(FP64_Mul(modesConst.r, g_Midpoint))))), modesConst.r);
+    FP_LONG r_times_m = FP64_Mul(modesConst.r, g_Midpoint);
+
+    // Safely exponentiate without overflow (ln(1+exp(x)) when x -> 'inf' = ln(exp(x)) = x. (in practice works for x >= 8))
+    if (r_times_m < (EXP_ARG_THRESHOLD << FP64_Shift))
+        modesConst.C0 = FP64_Mul(FP64_DivPrecise(FP64_Log(FP64_Add(1, FP64_Exp(r_times_m))), modesConst.r), modesConst.accel_sub_1);
+    else
+        modesConst.C0 = FP64_Mul(modesConst.accel_sub_1, g_Midpoint);
 
     // Rotation (precalculate the trig. functions)
     modesConst.sin_a = FP64_Sin(g_RotationAngle);
     modesConst.cos_a = FP64_Cos(g_RotationAngle);
+
+    modesConst.as_cos = FP64_Cos(g_AngleSnap_Angle);
+    modesConst.as_sin = FP64_Sin(g_AngleSnap_Angle);
+    modesConst.as_half_threshold = FP64_DivPrecise(g_AngleSnap_Threshold, 2ll << FP64_Shift);
+
+    modesConst.is_init = true;
 }
 
 static ktime_t g_next_update = 0;
@@ -133,8 +163,11 @@ INLINE void update_params(ktime_t now)
     g_update = 0;
     g_next_update = now + 1000000000ll;    //Next update is allowed after 1s of delay
 
+    modesConst.is_init = false;
+
     PARAM_UPDATE(InputCap);
     PARAM_UPDATE(Sensitivity);
+    PARAM_UPDATE(SensitivityY);
     PARAM_UPDATE(Acceleration);
     PARAM_UPDATE(OutputCap);
     PARAM_UPDATE(Offset);
@@ -143,6 +176,8 @@ INLINE void update_params(ktime_t now)
     PARAM_UPDATE(Midpoint);
     PARAM_UPDATE(PreScale);
     PARAM_UPDATE(RotationAngle);
+    PARAM_UPDATE(AngleSnap_Threshold);
+    PARAM_UPDATE(AngleSnap_Angle);
     PARAM_UPDATE_UL(LutSize);
     //PARAM_UPDATE(LutStride);
     if(g_LutSize > MAX_LUT_ARRAY_SIZE)
@@ -171,15 +206,13 @@ INLINE void update_params(ktime_t now)
     if((g_LutSize <= 1 /*|| g_LutStride == 0*/) && g_AccelerationMode == 6)
         g_AccelerationMode = 1;
 
+    // Angle snap threshold should be in range [0, PI)
+    if(g_AngleSnap_Threshold >= FP64_PI || g_AngleSnap_Threshold < 0) {
+        g_AngleSnap_Threshold = 0;
+    }
+
     update_constants();
 }
-
-const FP_LONG fp64_0_1     = 429496736;
-const FP_LONG fp64_1    = 1ll << FP64_Shift;
-const FP_LONG fp64_10      = 10ll << FP64_Shift;
-const FP_LONG fp64_100     = 100ll << FP64_Shift;
-const FP_LONG fp64_1000    = 1000ll << FP64_Shift;
-const FP_LONG fp64_10000    = 10000ll << FP64_Shift;
 
 // Acceleration happens here
 int accelerate(int *x, int *y, int *wheel)
@@ -227,7 +260,7 @@ int accelerate(int *x, int *y, int *wheel)
     // Editor node: I have no idea, what this line above really does, but commenting it out solves all my problems
     // with incorrect data. It seems that it tries to fix a problem that doesn't exist, or doesn't exist on my
     // specific setup (PC / System / Mice)
-    if(ms > fp64_100) ms = fp64_100;
+    if(ms > FP64_100) ms = FP64_100;
 
     //if(ms > 100) ms = 100;      //Original InterAccel has 200 here. RawAccel rounds to 100. So do we.
     last_ms = ms;
@@ -239,7 +272,7 @@ int accelerate(int *x, int *y, int *wheel)
     speed = FP64_Sqrt(FP64_Add(FP64_Mul(delta_x, delta_x), FP64_Mul(delta_y, delta_y)));
 
     // Apply Pre-Scale
-    if(g_PreScale != fp64_1)
+    if(g_PreScale != FP64_1)
         speed = FP64_Mul(speed, g_PreScale);
 
     //Apply speedcap
@@ -265,7 +298,7 @@ int accelerate(int *x, int *y, int *wheel)
 
             // FIXED-POINT:
             speed = FP64_Mul(speed, g_Acceleration);
-            speed = FP64_Add(fp64_1, speed);
+            speed = FP64_Add(FP64_1, speed);
         }
 
         // Power acceleration
@@ -287,7 +320,7 @@ int accelerate(int *x, int *y, int *wheel)
             // FIXED-POINT:
             speed = FP64_Mul(speed, g_Acceleration);
             speed = FP64_PowFast(speed, modesConst.exp_sub_1);
-            speed = FP64_Add(speed, fp64_1);
+            speed = FP64_Add(speed, FP64_1);
         }
 
         // Motivity (Sigmoid function)
@@ -301,7 +334,7 @@ int accelerate(int *x, int *y, int *wheel)
 
             // FIXED-POINT:
             FP_LONG exp = FP64_ExpFast(FP64_Sub(g_Midpoint, speed));
-            speed = FP64_Add(fp64_1, FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(fp64_1, exp)));
+            speed = FP64_Add(FP64_1, FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(FP64_1, exp)));
         }
 
         // Jump / Smooth Jump
@@ -310,15 +343,17 @@ int accelerate(int *x, int *y, int *wheel)
             // Jump: Acceleration / (1 + exp(r(midpoint - x))) + 1
             // Smooth: Integral of the above divided by x pretty much
 
-            FP_LONG D = FP64_ExpFast(FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed)));
+            FP_LONG exp_arg = FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed));
+            FP_LONG D = FP64_ExpFast(exp_arg);
 
             if(g_UseSmoothing) { // smooth
-                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(FP64_LogFast(FP64_Add(fp64_1, D)), modesConst.r)));
+                FP_LONG natural_log = exp_arg > (EXP_ARG_THRESHOLD << FP64_Shift) ? exp_arg : FP64_LogFast(FP64_Add(FP64_1, D));
+                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(natural_log, modesConst.r)));
                 // Not really an integral
-                speed = FP64_Add(FP64_DivPrecise(FP64_Sub(integral, modesConst.C0), speed), fp64_1);
+                speed = FP64_Add(FP64_DivPrecise(FP64_Sub(integral, modesConst.C0), speed), FP64_1);
             }
             else {
-                speed = FP64_Add(FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(fp64_1, D)), fp64_1);
+                speed = FP64_Add(FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(FP64_1, D)), FP64_1);
             }
         }
 
@@ -354,26 +389,57 @@ int accelerate(int *x, int *y, int *wheel)
         }
 
         else {
-            speed = fp64_1;
+            speed = FP64_1;
         }
     }
     else
-        speed = fp64_1; // Set speed to 1 if "below offset"
+        speed = FP64_1; // Set speed to 1 if "below offset"
 
     // Actually apply accelerated sensitivity, allow post-scaling and apply carry from previous round
     // Like RawAccel, sensitivity will be a final multiplier:
-    if(g_Sensitivity != fp64_1)
+    if (g_Sensitivity == g_SensitivityY) {
+        if(g_Sensitivity != FP64_1)
+            speed = FP64_Mul(speed, g_Sensitivity);
+
+        // Apply Output Limit
+        if(g_OutputCap > 0)
+            speed = FP64_Min(g_OutputCap, speed);
+
+        // Apply acceleration
+        delta_x = FP64_Mul(delta_x, speed);
+        delta_y = FP64_Mul(delta_y, speed);
+    } else {
         speed = FP64_Mul(speed, g_Sensitivity);
+        FP_LONG speed_Y = FP64_Mul(speed, g_SensitivityY);
 
-    // Apply Output Limit
-    if(g_OutputCap > 0)
-        speed = FP64_Min(g_OutputCap, speed);
+        // Apply Output Limit
+        if(g_OutputCap > 0) {
+            speed = FP64_Min(g_OutputCap, speed);
+            speed_Y = FP64_Min(g_OutputCap, speed_Y);
+        }
 
-    // Apply acceleration
-    delta_x = FP64_Mul(delta_x, speed);
-    delta_y = FP64_Mul(delta_y, speed);
-    //delta_x *= speed;
-    //delta_y *= speed;
+        // Apply acceleration
+        delta_x = FP64_Mul(delta_x, speed);
+        delta_y = FP64_Mul(delta_y, speed_Y);
+    }
+
+    // Angle Snapping
+    if(modesConst.as_half_threshold != 0) {
+        FP_LONG delta_mag = FP64_Sqrt(FP64_Add(FP64_Mul(delta_x, delta_x), FP64_Mul(delta_y, delta_y)));
+        if (delta_mag != 0) {
+            FP_LONG current_angle = FP64_Atan2(delta_y, delta_x);
+            FP_LONG angle_diff = FP64_Sub(g_AngleSnap_Angle, current_angle);
+            FP_LONG angle_diff_quarter = FP64_PI_2 - FP64_Abs(angle_diff);
+
+            int sign = FP64_Sign(angle_diff_quarter);
+            angle_diff_quarter = FP64_Abs(angle_diff_quarter) - FP64_PI_2;
+
+            if (FP64_Abs(angle_diff_quarter) <= modesConst.as_half_threshold) {
+                delta_x = FP64_Mul(modesConst.as_cos, delta_mag) * sign;
+                delta_y = FP64_Mul(modesConst.as_sin, delta_mag) * sign;
+            }
+        }
+    }
 
     delta_x = FP64_Add(delta_x, carry_x);
     delta_y = FP64_Add(delta_y, carry_y);

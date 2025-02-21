@@ -10,7 +10,11 @@
 //#define USE_INPUT_DRAG
 
 /* TODO
- * - Config export/import (from and to clipboard) in a human readable format or config.h
+ * + Config export/import (from and to clipboard) in a human readable format or config.h
+ * + Anisotropy
+ * + Angle snapping
+ * - Fully customizable curves (from polynomials)
+ * - Clean up the parameter formatting to allow for different precisions
  */
 
 AccelMode selected_mode = AccelMode_Linear;
@@ -143,6 +147,9 @@ int OnGui() {
 
                 bool change = false;
 
+                ImGui::Checkbox("Use anisotropy", &params[selected_mode].use_anisotropy);
+                ImGui::SetItemTooltip("Separate X/Y sensitivity values");
+
                 // Display Global Parameters First
         #ifdef USE_INPUT_DRAG
                 change |= ImGui::DragFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 0.01, 10, "Sensitivity %0.2f");
@@ -154,14 +161,17 @@ int OnGui() {
                 change |= ImGui::DragFloat("##Adv_Rotation", &params[selected_mode].rotation, 0.1, 0, 180,
                                                 u8"Rotation Angle %0.2f°");
         #else
-                change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.01, 10, "Sensitivity %0.2f");
+                if (params[selected_mode].use_anisotropy) {
+                    change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity X %.3f");
+                    change |= ImGui::SliderFloat("##SensY_Param", &params[selected_mode].sensY, 0.005, 5, "Sensitivity Y %.3f");
+                }
+                else
+                    change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity %.3f");
                 change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 100, "Output Cap. %0.2f");
                 change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
                 change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
                 change |= ImGui::SliderFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 10, "Pre-Scale %0.2f");
                 ImGui::SetItemTooltip("Used to adjust for different DPI values (Set to 800/DPI)");
-                change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, 0, 180,
-                                             u8"Rotation Angle %0.2f°");
         #endif
 
                 ImGui::SeparatorText("Advanced");
@@ -245,8 +255,7 @@ int OnGui() {
                             params[selected_mode].LUT_size = DriverHelper::ParseUserLutData(LUT_user_data,
                                                                                             params[selected_mode].LUT_data_x,
                                                                                             params[selected_mode].LUT_data_y,
-                                                                                            sizeof(params[selected_mode].LUT_data_x) /
-                                                                                            sizeof(params[selected_mode].LUT_data_x[0]));
+                                                                                            std::size(params[selected_mode].LUT_data_x));
                         }
                         break;
                     }
@@ -256,6 +265,16 @@ int OnGui() {
                     }
                 }
                 ImGui::PopID();
+
+                ImGui::SeparatorText("Rotation");
+                change |= ImGui::SliderFloat("##Adv_AS_Threshold", &params[selected_mode].as_threshold, 0, 179.99,
+                                             u8"Snapping Threshold %0.2f°");
+                change |= ImGui::SliderFloat("##Adv_AS_Angle", &params[selected_mode].as_angle, 0, 179.99,
+                                             u8"Snapping Angle %0.2f°");
+                change |= ImGui::SliderFloat("##Adv_Rotation", &params[selected_mode].rotation, -180, 180,
+                                             u8"Rotation Angle %0.2f°");
+                if(params[selected_mode].as_threshold > 0)
+                    ImGui::SetItemTooltip("Rotation is applied after Angle Snapping");
 
                 if(change)
                     functions[selected_mode].PreCacheFunc();
@@ -310,7 +329,7 @@ int OnGui() {
                 float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
                 //mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 100;
                 //float dt = fmaxf(ImGui::GetIO().DeltaTime, 0.003);
-                mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 1000;
+                mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 1000 / params[0].sens;
                 if(mouse_speed > recent_mouse_top_speed) {
                     recent_mouse_top_speed = mouse_speed;
                     last_time_speed_record_broken = steady_clock::now();
@@ -326,9 +345,8 @@ int OnGui() {
 
                 last_frame_speed = avg_speed;
 
-                bool is_record_old = duration_cast<milliseconds>(steady_clock::now() - last_time_speed_record_broken).count() > 1000;
-
-                if(is_record_old)
+                // Check if a second passed since the last highest mouse speed, if so reset the record speed dot
+                if(duration_cast<milliseconds>(steady_clock::now() - last_time_speed_record_broken).count() > 1000)
                     recent_mouse_top_speed = 0;
 
                 ImPlotPoint mousePoint_topSpeed = ImPlotPoint(recent_mouse_top_speed, recent_mouse_top_speed < params[selected_mode].offset ?
@@ -341,6 +359,10 @@ int OnGui() {
                     ImPlot::PlotLine("Function in use", functions[0].values, PLOT_POINTS, functions[0].x_stride);
                 }
 
+                if (params[selected_mode].use_anisotropy) {
+                    ImPlot::SetNextLineStyle(ImVec4(0.3, 0.3, 0.8, 1), 2);
+                    ImPlot::PlotLine("Active Mode Y##ActivePlotY", functions[selected_mode].values_y, PLOT_POINTS, functions[selected_mode].x_stride);
+                }
                 ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, 2);
                 ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS, functions[selected_mode].x_stride);
 
@@ -415,13 +437,12 @@ int OnGui() {
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {12, 12});
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
             if(ImGui::BeginChild("Devices", ImVec2(420, 0), ImGuiChildFlags_FrameStyle | ImGuiChildFlags_ResizeX)) {
-                auto avail = ImGui::GetContentRegionAvail();
                 ImGui::PopStyleColor();
 
                 ImGui::SeparatorText("Device Selection");
 
                 for (int i = 0; i < devices.size(); i++) {
-                    auto dev = devices[i];
+                    const auto& dev = devices[i];
                     ImGui::PushID(i);
                     if (ImGui::ModeSelectable(dev.name.c_str(), i == selected_device, 0, {-1, 0}))
                         selected_device = i;
@@ -444,7 +465,6 @@ int OnGui() {
             ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {10, 10});
             ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.1f, 0.1f, 0.1f, 1.0f));
             if(ImGui::BeginChild("Device_Parameters", ImVec2(320, -1), ImGuiChildFlags_FrameStyle | ImGuiChildFlags_ResizeX)) {
-                auto avail = ImGui::GetContentRegionAvail();
                 ImGui::PopStyleColor();
 
                 ImGui::SeparatorText("Device Parameters");
@@ -603,14 +623,17 @@ void ResetParameters(void) {
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 5), 2.1);
 
         if(mode == 5)
-            params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.1);
+            params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.01);
 
         if(mode == 2)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.1);
 
         functions[mode] = CachedFunction(((float)PLOT_X_RANGE) / PLOT_POINTS, &params[mode]);
         //printf("stride = %f\n", functions[mode].x_stride);
+        bool old_use_ani = functions[mode].params->use_anisotropy;
+        functions[mode].params->use_anisotropy = true;
         functions[mode].PreCacheFunc();
+        functions[mode].params->use_anisotropy = old_use_ani;
     }
 }
 
@@ -642,6 +665,7 @@ int main() {
     else {
         // Read driver parameters to a dummy aggregate
         DriverHelper::GetParameterF("Sensitivity", start_params.sens);
+        DriverHelper::GetParameterF("SensitivityY", start_params.sensY);
         DriverHelper::GetParameterF("OutputCap", start_params.outCap);
         DriverHelper::GetParameterF("InputCap", start_params.inCap);
         DriverHelper::GetParameterF("Offset", start_params.offset);
@@ -654,11 +678,17 @@ int main() {
         DriverHelper::GetParameterI("LutSize", start_params.LUT_size);
         DriverHelper::GetParameterF("RotationAngle", start_params.rotation);
         start_params.rotation /= DEG2RAD;
+        DriverHelper::GetParameterF("AngleSnap_Threshold", start_params.as_threshold);
+        start_params.as_threshold /= DEG2RAD;
+        DriverHelper::GetParameterF("AngleSnap_Angle", start_params.as_angle);
+        start_params.as_angle /= DEG2RAD;
         //DriverHelper::GetParameterF("LutStride", start_params.LUT_stride);
         std::string Lut_dataBuf;
         DriverHelper::GetParameterS("LutDataBuf", Lut_dataBuf);
         Lut_dataBuf.copy(LUT_user_data, sizeof(LUT_user_data), 0);
         DriverHelper::ParseDriverLutData(Lut_dataBuf.c_str(), start_params.LUT_data_x, start_params.LUT_data_y);
+
+        start_params.use_anisotropy = start_params.sensY != start_params.sens;
 
         used_mode = start_params.accelMode;
 

@@ -246,7 +246,8 @@ inline AccelMode AccelMode_From_String(std::string mode_text) {
 }
 
 struct Parameters {
-    float sens = 1.0f;
+    float sens = 1.0f; // Sensitivity for X axis only if sens != sensY (anisotropy is on), otherwise sensitivity for both axes
+    float sensY = 1.0f; // Unused when anisotropy is off (sens == sensY)
     float outCap = 0.f;
     float inCap = 0.f;
     float offset = 0.0f;
@@ -258,6 +259,8 @@ struct Parameters {
     AccelMode accelMode = AccelMode_Current;
     bool useSmoothing = true; // true/false
     float rotation = 0; // Stored in degrees, converted to radians when writing out
+    float as_threshold = 0; // Stored in degrees, converted to radians when writing out
+    float as_angle = 0; // Stored in degrees, converted to radians when writing out
 
     /// The issue of performance with LUT is currently solved with a fixed stride, but another approach would be to
     /// store separately x and y values, sort both by x values, and do a binary search every time you want to find points.
@@ -268,6 +271,9 @@ struct Parameters {
     int LUT_size = 0;
 
     Parameters() = default;
+
+    bool use_anisotropy = false; // This parameter is not saved anywhere, it's just a helper.
+    // Anisotropy is on if sensY != sens, off otherwise.
 
     //Parameters(float sens, float sensCap, float speedCap, float offset, float accel, float exponent, float midpoint,
     //           float scrollAccel, int accelMode);

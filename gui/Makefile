@@ -1,7 +1,7 @@
 # Define the compiler and flags
 CXX = g++
 CXXFLAGS = -Wall -std=c++17 -O2 -I gui/External -flto=auto
-LIBS = -lglfw  # this might have to be lglfw3 instead
+LIBS = -lglfw -ldl # this might have to be lglfw3 instead
 #LDFLAGS = -flto
 
 ifneq ("$(wildcard $(/usr/lib/x86_64-linux-gnu/libglfw3.so))","") # Check if glfw3 exists

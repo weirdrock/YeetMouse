@@ -11,6 +11,7 @@
 class CachedFunction {
 public:
     float values[PLOT_POINTS]{0};
+    float values_y[PLOT_POINTS]{0};
     float x_stride = 0;
     Parameters* params;
 
@@ -51,6 +52,7 @@ public:
             }
             case AccelMode_Jump: // Jump
             {
+                // Might cause issues with high exponent's argument values
                 double exp_param = smoothness * (params->midpoint - x);
                 double D = exp(exp_param);
                 if(params->useSmoothing) {

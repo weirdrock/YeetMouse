@@ -320,11 +320,14 @@ bool Parameters::SaveAll() {
 
     // General
     res &= SetParameterTy("Sensitivity", sens);
+    res &= SetParameterTy("SensitivityY", use_anisotropy ? sensY : sens);
     res &= SetParameterTy("OutputCap", outCap);
     res &= SetParameterTy("InputCap", inCap);
     res &= SetParameterTy("Offset", offset);
     res &= SetParameterTy("AccelerationMode", accelMode);
     res &= SetParameterTy("RotationAngle", rotation * DEG2RAD);
+    res &= SetParameterTy("AngleSnap_Threshold", as_threshold * DEG2RAD);
+    res &= SetParameterTy("AngleSnap_Angle", as_angle * DEG2RAD);
 
     // Specific
     res &= SetParameterTy("Acceleration", accel);
@@ -421,31 +424,38 @@ std::vector<DriverHelper::DeviceInfo> DriverHelper::DiscoverDevices() {
     // Enumerate all USB devices
     std::vector<std::string> devices_paths;
     std::vector<DriverHelper::DeviceInfo> devices;
-    DIR* dir = opendir("/sys/bus/usb/devices");
-    if (!dir) {
-        std::cerr << "Failed to open /sys/bus/usb/devices" << std::endl;
-        return {};
-    }
+    try {
+        DIR *dir = opendir("/sys/bus/usb/devices");
+        if (!dir) {
+            std::cerr << "Failed to open /sys/bus/usb/devices" << std::endl;
+            return {};
+        }
 
-    struct dirent* ent;
-    while ((ent = readdir(dir)) != nullptr) {
-        try {
-            //printf("ent = %s\n", ent->d_name);
-            if ((ent->d_type == DT_DIR || ent->d_type == DT_LNK) && strcmp(ent->d_name, ".") != 0 &&
-                strcmp(ent->d_name, "..") != 0) {
-                std::string path = std::string("/sys/bus/usb/devices/") + ent->d_name;
-                struct stat st{0};
-                if (stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-                    devices_paths.emplace_back(ent->d_name);
+        struct dirent *ent;
+        while ((ent = readdir(dir)) != nullptr) {
+            try {
+                //printf("ent = %s\n", ent->d_name);
+                if ((ent->d_type == DT_DIR || ent->d_type == DT_LNK) && strcmp(ent->d_name, ".") != 0 &&
+                    strcmp(ent->d_name, "..") != 0) {
+                    std::string path = std::string("/sys/bus/usb/devices/") + ent->d_name;
+                    struct stat st{0};
+                    if (stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
+                        devices_paths.emplace_back(ent->d_name);
+                    }
                 }
             }
+            catch (std::exception &ex) {
+                printf("Error discovering device: %s\n", ex.what());
+                continue;
+            }
         }
-        catch (std::exception& ex) {
-            printf("Error discovering device: %s\n", ex.what());
-            continue;
-        }
+        closedir(dir);
     }
-    closedir(dir);
+    catch (std::exception& ex) {
+        printf("Could not enumerate the devices: %s\n", ex.what());
+        return {};
+    }
+    struct dirent *ent;
 
     //printf("found %zu devices\n", devices_paths.size());
 

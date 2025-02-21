@@ -259,4 +259,4 @@ By default the program will now run at the `Fixed Fast` setting.
 `FP64_Sqrt()` is used as the `Fast` version. It also implements all the optimizations I managed to come up with.*
 
 
-*If you would only look at the images, this page would look like a failed modern art project...*
+*If you were to only look at the images, this page would look like a failed modern art project...*

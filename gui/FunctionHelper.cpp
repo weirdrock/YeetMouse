@@ -52,11 +52,14 @@ void CachedFunction::PreCacheFunc() {
     for(int i = 0; i < PLOT_POINTS; i++) {
         if(x < 0) { // skip offset
             values[i] = params->sens;
+            values_y[i] = params->sensY;
             x += x_stride;
             continue;
         }
         float val = EvalFuncAt(x);
         values[i] = val; // fabsf(params->outCap) > 0.01 ? fminf(val, params->outCap) : val;
+        if (params->use_anisotropy)
+            values_y[i] = val / params->sens * params->sensY;
         x += x_stride;
     }
 }
