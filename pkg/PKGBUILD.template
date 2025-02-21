@@ -1,23 +1,23 @@
 # Maintainer: Klaus Zipfel <klaus (at) zipfel (dot) family>
 # Contributor: Christopher Williams <chilliams (at) gmail (dot) com>
 
-pkgbase=leetmouse
-pkgname=('leetmouse-driver-dkms')
+pkgbase=yeetmouse
+pkgname=('yeetmouse-driver-dkms')
 pkgver=__VERSION__
 pkgrel=1
 pkgdesc="USB HID Boot Protocol mouse driver with acceleration."
 arch=('i686' 'x86_64')
-url="https://github.com/systemofapwne/leetmouse"
+url="https://github.com/AndyFilter/YeetMouse"
 license=('GPL2')
 #makedepends=('python-setuptools')
 source=("__SRC__")
 sha256sums=('__HASH__')
 
 # Currently we only supply the driver
-package_leetmouse-driver-dkms() {
-  pkgdesc="Kernel driver for LEETMOUSE (DKMS-variant)"
+package_yeetmouse-driver-dkms() {
+  pkgdesc="Kernel driver for YEETMOUSE (DKMS-variant)"
   depends=('dkms')
-  install=leetmouse-driver-dkms.install
+  install=yeetmouse-driver-dkms.install
 
   cd "$pkgbase-$pkgver"
   echo $pkgbase-$pkgver

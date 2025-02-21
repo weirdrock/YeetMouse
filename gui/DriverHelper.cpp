@@ -10,13 +10,13 @@
 #include <sys/stat.h>
 #include <set>
 
-#define LEETMOUSE_PARAMS_DIR "/sys/module/leetmouse/parameters/"
+#define YEETMOUSE_PARAMS_DIR "/sys/module/yeetmouse/parameters/"
 
 template<typename Ty>
 bool GetParameterTy(const std::string& param_name, Ty &value) {
     try {
         using namespace std;
-        ifstream file(LEETMOUSE_PARAMS_DIR + param_name);
+        ifstream file(YEETMOUSE_PARAMS_DIR + param_name);
 
         if(file.bad())
             return false;
@@ -34,7 +34,7 @@ bool GetParameterTy(const std::string& param_name, Ty &value) {
 bool GetParameterTy(const std::string& param_name, std::string &value) {
     try {
         using namespace std;
-        ifstream file(LEETMOUSE_PARAMS_DIR + param_name);
+        ifstream file(YEETMOUSE_PARAMS_DIR + param_name);
 
         if(file.bad())
             return false;
@@ -55,7 +55,7 @@ template<typename Ty>
 bool SetParameterTy(const std::string& param_name, Ty value) {
     try {
         using namespace std;
-        ofstream file(LEETMOUSE_PARAMS_DIR + param_name);
+        ofstream file(YEETMOUSE_PARAMS_DIR + param_name);
 
         if (file.bad())
             return false;
@@ -94,7 +94,7 @@ namespace DriverHelper {
     bool CleanParameters(int& fixed_num) {
         namespace fs = std::filesystem;
 
-        for (const auto & entry : fs::directory_iterator(LEETMOUSE_PARAMS_DIR)) {
+        for (const auto & entry : fs::directory_iterator(YEETMOUSE_PARAMS_DIR)) {
             std::string str;
             std::ifstream t(entry.path());
             if(!t.is_open() || t.bad() || t.fail())
@@ -171,7 +171,7 @@ namespace DriverHelper {
     bool ValidateDirectory() {
         namespace fs = std::filesystem;
         try {
-            auto dir = fs::directory_entry(LEETMOUSE_PARAMS_DIR);
+            auto dir = fs::directory_entry(YEETMOUSE_PARAMS_DIR);
             if(!dir.exists())
                 return false;
         }
@@ -528,7 +528,7 @@ std::vector<DriverHelper::DeviceInfo> DriverHelper::DiscoverDevices() {
                 }
             }
 
-            device_info.is_bound_to_leetmouse = device_info.driver_name == "leetmouse";
+            device_info.is_bound_to_yeetmouse = device_info.driver_name == "yeetmouse";
 
             devices.push_back(device_info);
 

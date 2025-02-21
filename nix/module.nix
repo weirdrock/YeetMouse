@@ -102,19 +102,19 @@ in {
       extraRules = let
         echo = "${pkgs.coreutils}/bin/echo";
         yeetmouseConfig = with cfg.parameters; pkgs.writeShellScriptBin "yeetmouseConfig" ''
-          ${echo} "${toString Acceleration}" > /sys/module/leetmouse/parameters/Acceleration
-          ${echo} "${toString Exponent}" > /sys/module/leetmouse/parameters/Exponent
-          ${echo} "${toString InputCap}" > /sys/module/leetmouse/parameters/InputCap
-          ${echo} "${toString Midpoint}" > /sys/module/leetmouse/parameters/Midpoint
-          ${echo} "${toString Offset}" > /sys/module/leetmouse/parameters/Offset
-          ${echo} "${toString OutputCap}" > /sys/module/leetmouse/parameters/OutputCap
-          ${echo} "${toString PreScale}" > /sys/module/leetmouse/parameters/PreScale
-          ${echo} "${toString RotationAngle}" > /sys/module/leetmouse/parameters/RotationAngle
-          ${echo} "${toString Sensitivity}" > /sys/module/leetmouse/parameters/Sensitivity
-          ${echo} "${toString ScrollsPerTick}" > /sys/module/leetmouse/parameters/ScrollsPerTick
-          ${echo} "${toString (modeValueToInt AccelerationMode)}" > /sys/module/leetmouse/parameters/AccelerationMode
-          ${echo} "${if UseSmoothing then "1" else "0"}" > /sys/module/leetmouse/parameters/UseSmoothing
-          ${echo} "1" > /sys/module/leetmouse/parameters/update
+          ${echo} "${toString Acceleration}" > /sys/module/yeetmouse/parameters/Acceleration
+          ${echo} "${toString Exponent}" > /sys/module/yeetmouse/parameters/Exponent
+          ${echo} "${toString InputCap}" > /sys/module/yeetmouse/parameters/InputCap
+          ${echo} "${toString Midpoint}" > /sys/module/yeetmouse/parameters/Midpoint
+          ${echo} "${toString Offset}" > /sys/module/yeetmouse/parameters/Offset
+          ${echo} "${toString OutputCap}" > /sys/module/yeetmouse/parameters/OutputCap
+          ${echo} "${toString PreScale}" > /sys/module/yeetmouse/parameters/PreScale
+          ${echo} "${toString RotationAngle}" > /sys/module/yeetmouse/parameters/RotationAngle
+          ${echo} "${toString Sensitivity}" > /sys/module/yeetmouse/parameters/Sensitivity
+          ${echo} "${toString ScrollsPerTick}" > /sys/module/yeetmouse/parameters/ScrollsPerTick
+          ${echo} "${toString (modeValueToInt AccelerationMode)}" > /sys/module/yeetmouse/parameters/AccelerationMode
+          ${echo} "${if UseSmoothing then "1" else "0"}" > /sys/module/yeetmouse/parameters/UseSmoothing
+          ${echo} "1" > /sys/module/yeetmouse/parameters/update
         '';
       in ''
         SUBSYSTEMS=="usb|input|hid", ATTRS{bInterfaceClass}=="03", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="02", ATTRS{bInterfaceNumber}=="00", RUN+="${yeetmouseConfig}/bin/yeetmouseConfig"

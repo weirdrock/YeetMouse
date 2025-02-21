@@ -536,7 +536,7 @@ int OnGui() {
             ImGui::PushStyleColor(ImGuiCol_Button, ImColor::HSV(0.975, 0.9, 1).Value);
             ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImColor::HSV(0.975, 0.82, 1).Value);
             ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImColor::HSV(0.975, 0.75, 1).Value);
-            ImGui::BeginDisabled(!devices[selected_device].is_bound_to_leetmouse);
+            ImGui::BeginDisabled(!devices[selected_device].is_bound_to_yeetmouse);
             if (ImGui::Button("Unbind", {avail.x / 2 - 5, -1})) {
                 //DriverHelper::UnBindFromDriver(devices[selected_device].driver_name.c_str(), devices[selected_device].device_id);
                 //DriverHelper::BindToDriver("usbhid", devices[selected_device].device_id);
@@ -553,10 +553,10 @@ int OnGui() {
             ImGui::PopStyleColor(3);
             ImGui::SameLine();
 
-            ImGui::BeginDisabled(devices[selected_device].is_bound_to_leetmouse);
+            ImGui::BeginDisabled(devices[selected_device].is_bound_to_yeetmouse);
             if(ImGui::Button("Bind", {-1, -1})) {
                 if(DriverHelper::UnBindFromDriver(devices[selected_device].driver_name.c_str(), devices[selected_device].device_id)) {
-                    if (!DriverHelper::BindToDriver("leetmouse", devices[selected_device].device_id)) {
+                    if (!DriverHelper::BindToDriver("yeetmouse", devices[selected_device].device_id)) {
                         // Revert the changes if binding fails
                         DriverHelper::BindToDriver(devices[selected_device].driver_name.c_str(),
                                                    devices[selected_device].device_id);
@@ -654,7 +654,7 @@ int main() {
 
     if (!DriverHelper::ValidateDirectory()) {
         fprintf(stderr,
-                "LeetMouse directory doesnt exist!\nInstall the driver first, or check the parameters path.\n");
+                "YeetMouse directory doesnt exist!\nInstall the driver first, or check the parameters path.\n");
         return 2;
     }
 

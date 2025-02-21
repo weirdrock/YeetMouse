@@ -35,13 +35,13 @@
    # Create the PKGBUILD, copy associated files and run makepkg
    ./scripts/build_arch.sh
    # Run pacman on the created package
-   sudo pacman -U pkg/build/leetmouse*.zst
+   sudo pacman -U pkg/build/yeetmouse*.zst
    #+end_src
-   All your mice should now be bound to this driver. They will also automatically bind to it after a reboot. If this did not work, run =sudo /usr/lib/udev/leetmouse_manage bind_all=
+   All your mice should now be bound to this driver. They will also automatically bind to it after a reboot.
    
    *Uninstallation*
    #+begin_src sh
-   sudo pacman -R leetmouse-driver-dkms
+   sudo pacman -R yeetmouse-driver-dkms
    #+end_src
    All your mice should now be bound to the generic usbhid driver again.
 
@@ -57,27 +57,27 @@
    
    *Installation*
 
-   Determine the current version of this module by examining the variable =DKMS_VER= in the =Makefile=. It can be e.g. 0.9.0
+   Determine the current version of this module by examining the variable =DKMS_VER= in the =Makefile=. It can be e.g. 0.9.2
    Run the following commands to build and install the kernel module
    #+begin_src sh
    # Install the driver and activate the dkms module
-   sudo make setup_dkms && sudo make udev_install
-   sudo dkms install -m leetmouse-driver -v 0.9.0 # Enter the version you determined from the Makefile earlier in here
+   sudo make setup_dkms
+   sudo dkms install -m yeetmouse-driver -v 0.9.2 # Enter the version you determined from the Makefile earlier in here
+   sudo modprobe yeetmouse
    #+end_src
    (Or you can use the built-in install script like so: =sudo ./install.sh=).
 
-   All your mice should now be bound to this driver. They will also automatically bind to it after a reboot. If this did not work, run =sudo /usr/lib/udev/leetmouse_manage bind_all=
+   All your mice should now be bound to this driver. They will also automatically bind to it after a reboot.
    If this still does not work, there is a major problem
    
    *Uninstallation*
    
    You again need to know the =version= as described above for the installation
    #+begin_src sh
-   # Unbind all mice from the driver
-   sudo /usr/lib/udev/leetmouse_manage unbind_all
    # Uninstall the driver
-   sudo dkms remove -m leetmouse-driver -v 0.9.0
-   sudo make remove_dkms && sudo make udev_uninstall
+   sudo dkms remove yeetmouse-driver/0.9.2 --all
+   sudo make remove_dkms
+   sudo rmmod yeetmouse
    #+end_src
    (Or you can use the built-in uninstall script like so: =sudo ./uninstall.sh=).
 
@@ -88,11 +88,9 @@
    Compile the module, remove previously loaded modules and insert it.
    #+begin_src sh
    make clean && make
-   sudo rmmod leetmouse
-   sudo insmod ./driver/leetmouse.ko
+   sudo rmmod yeetmouse
+   sudo insmod ./driver/yeetmouse.ko
    #+end_src
-   If you did not install the udev rules before via =sudo make udev_install= you need to manually bind your mouse to this driver.
-   You can take a look at =/scripts/bind.sh= for an example on how to determine your mouse's USB address for that. However using the udev rules for development is advised.
 
 * FAQ
 *** How to set custom parameter value?

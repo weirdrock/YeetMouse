@@ -1,0 +1,9 @@
+pre_remove() {
+    # Unbind all currently bound mice from yeetmouse and rebind them to usbhid
+    /usr/lib/udev/yeetmouse_manage unbind_all
+}
+
+post_remove() {
+	# Unload the kernel module from memory
+	rmmod yeetmouse
+}

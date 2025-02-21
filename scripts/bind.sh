@@ -33,5 +33,5 @@ DEVICES=( "5-1.1:1.1" "1-3:1.2" )
 for DEVICE in "${DEVICES[@]}"; do
     echo "Rebinding $DEVICE"
     echo -n "$DEVICE" > /sys/bus/usb/drivers/usbhid/unbind
-    echo -n "$DEVICE" > /sys/bus/usb/drivers/leetmouse/bind
+    echo -n "$DEVICE" > /sys/bus/usb/drivers/yeetmouse/bind
 done

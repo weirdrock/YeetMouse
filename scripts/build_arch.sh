@@ -4,13 +4,13 @@ ROOT="$(git rev-parse --show-toplevel)"
 
 # Read current version
 VERSION=$(cat "${ROOT}/Makefile" | grep -oP "(?<=DKMS_VER\?=)[0-9\.]+")
-SRC_NAME=leetmouse-$VERSION
+SRC_NAME=yeetmouse-$VERSION
 
 SRC=$SRC_NAME.tar.xz
 
 # Create PKGBUILD for AUR and the bin package below for release via github
 if [ "$1" = "aur" ]; then
-    SRC='https://github.com/AndyFilter/YeetMouse/releases/download/v$pkgver/leetmouse-$pkgver.tar.xz'
+    SRC='https://github.com/AndyFilter/YeetMouse/releases/download/v$pkgver/yeetmouse-$pkgver.tar.xz'
     echo $SRC
 fi
 
@@ -28,7 +28,7 @@ sed -i 's|'__HASH__'|'$HASH'|' "${ROOT}/pkg/build/PKGBUILD"
 sed -i 's|'__SRC__'|'$SRC'|' "${ROOT}/pkg/build/PKGBUILD"
 
 # Copy "install" file to build
-cp -f "${ROOT}/pkg/leetmouse-driver-dkms.install" "${ROOT}/pkg/build/"
+cp -f "${ROOT}/pkg/yeetmouse-driver-dkms.install" "${ROOT}/pkg/build/"
 
 # When we build the AUR package, we do not want to do the next steps
 if [ "$1" = "aur" ]; then

@@ -12,8 +12,8 @@ GUIDIR?=$(shell pwd)/gui
 # Where kernel drivers are going to be installed
 MODULEDIR?=/lib/modules/$(shell uname -r)/kernel/drivers/usb
 
-DKMS_NAME?=leetmouse-driver
-DKMS_VER?=0.9.0
+DKMS_NAME?=yeetmouse-driver
+DKMS_VER?=0.9.2
 
 .PHONY: driver
 .PHONY: GUI
@@ -31,31 +31,31 @@ GUI:
 	@echo "DONE!"
 
 driver:
-	@echo -e "\n::\033[32m Compiling leetmouse kernel module\033[0m"
+	@echo -e "\n::\033[32m Compiling yeetmouse kernel module\033[0m"
 	@echo "========================================"
 	@cp -n $(DRIVERDIR)/config.sample.h $(DRIVERDIR)/config.h || true
 	$(MAKE) -C $(KERNELDIR) M=$(DRIVERDIR) modules
 
 
 driver_clean:
-	@echo -e "\n::\033[32m Cleaning leetmouse kernel module\033[0m"
+	@echo -e "\n::\033[32m Cleaning yeetmouse kernel module\033[0m"
 	@echo "========================================"
 	$(MAKE) -C "$(KERNELDIR)" M="$(DRIVERDIR)" clean
 
 # Install kernel modules and then update module dependencies
 driver_install:
-	@echo -e "\n::\033[34m Installing leetmouse kernel module\033[0m"
+	@echo -e "\n::\033[34m Installing yeetmouse kernel module\033[0m"
 	@echo "====================================================="
 	@mkdir -p $(DESTDIR)/$(MODULEDIR)
-	@cp -v $(DRIVERDIR)/leetmouse.ko $(DESTDIR)/$(MODULEDIR)
-	@chown -v root:root $(DESTDIR)/$(MODULEDIR)/leetmouse.ko
+	@cp -v $(DRIVERDIR)/yeetmouse.ko $(DESTDIR)/$(MODULEDIR)
+	@chown -v root:root $(DESTDIR)/$(MODULEDIR)/yeetmouse.ko
 	depmod
 
 # Remove kernel modules
 driver_uninstall:
-	@echo -e "\n::\033[34m Uninstalling leetmouse kernel module\033[0m"
+	@echo -e "\n::\033[34m Uninstalling yeetmouse kernel module\033[0m"
 	@echo "====================================================="
-	@rm -fv $(DESTDIR)/$(MODULEDIR)/leetmouse.ko
+	@rm -fv $(DESTDIR)/$(MODULEDIR)/yeetmouse.ko
 
 setup_dkms:
 	@echo -e "\n::\033[34m Installing DKMS files\033[0m"
@@ -82,7 +82,7 @@ package:
 	@echo -e "\n::\033[34m Building installable package\033[0m"
 	@echo "====================================================="
 	@./scripts/build_arch.sh
-	@mv ./pkg/build/leetmouse*.zst .
+	@mv ./pkg/build/yeetmouse*.zst .
 
 manual_install_msg:
 	@echo "Please do not install the driver using this method. Use a distribution package as it tracks the files installed and can remove them afterwards. If you are 100% sure, you want to do this, find the correct target in the Makefile."

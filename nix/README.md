@@ -115,8 +115,8 @@ in {
     extraRules = let
       echo = "${pkgs.coreutils}/bin/echo";
       yeetmouseConfig = pkgs.writeShellScriptBin "yeetmouseConfig" ''
-        ${echo} "1.0" > /sys/module/leetmouse/parameters/Acceleration
-        ${echo} "1" > /sys/module/leetmouse/parameters/update
+        ${echo} "1.0" > /sys/module/yeetmouse/parameters/Acceleration
+        ${echo} "1" > /sys/module/yeetmouse/parameters/update
       '';
     in ''
       SUBSYSTEMS=="usb|input|hid", ATTRS{bInterfaceClass}=="03", ATTRS{bInterfaceSubClass}=="01", ATTRS{bInterfaceProtocol}=="02", ATTRS{bInterfaceNumber}=="00", RUN+="${yeetmouseConfig}/bin/yeetmouseConfig"

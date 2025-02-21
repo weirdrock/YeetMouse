@@ -98,7 +98,7 @@ namespace DriverHelper {
         DeviceInfo() = default;
         explicit DeviceInfo(std::string id): device_id(std::move(id)) {};
 
-        bool is_bound_to_leetmouse = false;
+        bool is_bound_to_yeetmouse = false;
     };
 
     std::vector<DeviceInfo> DiscoverDevices();
