@@ -2,24 +2,20 @@
 #define YEETMOUSE_DRIVERHELPER_H
 
 #include <cmath>
-#include <utility>
-#include <vector>
 #include <string>
-
-#include <iostream>
-#include <string>
-#include <vector>
-#include <cstring>
-#include <fstream>
-#include <sstream>
-#include <sys/types.h>
 #include <unistd.h>
 #include <filesystem>
 #include <algorithm>
+#include <array>
+#include <vector>
+
+#include "External/ImGui/imgui.h"
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
 #define DEG2RAD (M_PI / 180.0)
+
+struct ImVec2;
 
 namespace DriverHelper {
     bool GetParameterF(const std::string& param_name, float& value);
@@ -55,6 +51,7 @@ enum AccelMode {
     AccelMode_Motivity = 4,
     AccelMode_Jump = 5,
     AccelMode_Lut = 6,
+    AccelMode_CustomCurve = 7,
     AccelMode_Count,
 };
 
@@ -145,6 +142,12 @@ struct Parameters {
     double LUT_data_x[MAX_LUT_ARRAY_SIZE];
     double LUT_data_y[MAX_LUT_ARRAY_SIZE];
     int LUT_size = 0;
+
+    // TODO
+    //  fix the custom curve points
+    // Custom Curve (stored as a vector of points for now)
+    std::vector<ImVec2> custom_curve_points { {10, 1.5}, {100, 1.1} }; // actual points
+    std::vector<std::array<ImVec2, 2>> custom_curve_control_points { std::array<ImVec2, 2>( { ImVec2{10, 2.3}, ImVec2{100, 0.3} } ) }; // control points
 
     Parameters() = default;
 
