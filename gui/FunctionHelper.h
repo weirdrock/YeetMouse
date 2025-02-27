@@ -19,8 +19,9 @@ public:
     CachedFunction() {};
 
     float EvalFuncAt(float x);
-
     void PreCacheFunc();
+
+    void SmoothBezier();
 
 private:
     // Constant parameters for Jump

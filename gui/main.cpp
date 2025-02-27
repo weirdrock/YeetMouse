@@ -43,8 +43,11 @@ void ResetParameters();
 int OnGui() {
     using namespace std::chrono;
 
+    ImGuiContext& g = *GImGui;
+
     static float mouse_smooth = 0.75;
     static steady_clock::time_point last_apply_clicked;
+    static bool show_custom_curve_control_points = true, move_control_points_along = false;
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -142,7 +145,7 @@ int OnGui() {
 
         bool change = false;
 
-        ImGui::Checkbox("Use anisotropy", &params[selected_mode].use_anisotropy);
+        change |= ImGui::Checkbox("Use anisotropy", &params[selected_mode].use_anisotropy);
         ImGui::SetItemTooltip("Separate X/Y sensitivity values");
 
         // Display Global Parameters First
@@ -251,7 +254,7 @@ int OnGui() {
                 //change |= ImGui::DragFloat("##LUT_Stride_Param", &params[selected_mode].LUT_stride, 0.05, 0.05, 10, "Stride %0.2f");
                 //ImGui::SetItemTooltip("Gap between each 'y' value");
                 if (ImGui::Button("Save", {-1, 0})) {
-                    change |= true;
+                    change = true;
 
                     // Needs to be converted to int, because the kernel parameters don't deal too well with unsigned long longs
                     params[selected_mode].LUT_size = DriverHelper::ParseUserLutData(LUT_user_data,
@@ -260,6 +263,84 @@ int OnGui() {
                         std::size(params[selected_mode].LUT_data_x));
                 }
                 break;
+            case AccelMode_CustomCurve: {
+                if (ImGui::Button("Smooth Curve", {-1, 0})) {
+                    functions[selected_mode].SmoothBezier();
+                    change |= true;
+                }
+                ImGui::SetItemTooltip("Applies smoothing to the curve without moving the points");
+
+                ImGui::Checkbox("Show Control Points", &show_custom_curve_control_points);
+
+                ImGui::Checkbox("Link Control Points", &move_control_points_along);
+                ImGui::SetItemTooltip("Moves control points along with it's parent curve point");
+
+                auto& points = params[selected_mode].custom_curve_points;
+                auto& control_points = params[selected_mode].custom_curve_control_points;
+
+                ImGui::Unindent();
+                for (int i = 0; i < points.size(); ++i) {
+                    float p_min = i > 0 ? points[i-1].x + CURVE_POINTS_MARGIN : 0;
+                    float p_max = i < points.size() - 1 ? points[i+1].x - CURVE_POINTS_MARGIN : 1000;
+                    auto& p = points[i];
+                    ImGui::PushID(i);
+                    if (ImGui::TreeNode("CrvPnt", "Point %d", i)) {
+                        auto p_before = p;
+                        bool drag_changed = false;
+                        ImGui::BeginGroup();
+                        ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
+                        drag_changed |= ImGui::DragFloat("##pos1x", &p.x, 0.5, p_min, p_max);
+                        ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
+                        drag_changed |= ImGui::DragFloat("##pos1y", &p.y, 0.01, 0, 10);
+                        ImGui::PopItemWidth();
+                        ImGui::EndGroup();
+
+                        change |= drag_changed;
+
+                        if (move_control_points_along && drag_changed) {
+                            ImVec2 drag = p - p_before;
+
+                            //printf("held drag = (%.2f, %.2f)\n", drag.x, drag.y);
+                            // Apply the Bezier point drag to it's control points
+                            if (i == 0) {
+                                control_points[0][0] += drag;
+                            }
+                            else if (i == points.size() - 1) {
+                                control_points[i-1][1] += drag;
+                            }
+                            else {
+                                control_points[i][0] += drag;
+                                control_points[i-1][1] += drag;
+                            }
+
+                        }
+                        if (points.size() > 1)
+                            for (int j = (i == points.size() - 1 || i == 0) ? 0 : 1; j >= 0; j--) {
+                                ImGui::PushID(j);
+                                ImGui::BeginGroup();
+                                ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
+                                auto& p1 = control_points[i == points.size() - 1 ? (i-1) : (i-j)][i == 0 ? 0 : i == points.size() - 1 ? 1 : j];
+                                // p.x = std::clamp(p.x, i > 0 ? points[i-1].x + 0.5f : 0, i < points.size() - 1 ? points[i+1].x - 0.5f : 1000);
+                                change |= ImGui::DragFloat("##pos2x", &p1.x, 0.5, p_min, p_max);
+                                ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
+                                change |= ImGui::DragFloat("##pos2y", &p1.y, 0.01, 0, 10);
+                                ImGui::PopItemWidth();
+                                ImGui::EndGroup();
+                                ImGui::PopID();
+                            }
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::Indent();
+
+                if (change) {
+                    params[selected_mode].ApplyCurveConstraints();
+                    params[selected_mode].ExportCurveToLUT();
+                }
+
+                break;
+            }
             }
             default: {
                 break;
@@ -368,7 +449,8 @@ int OnGui() {
                              functions[selected_mode].x_stride);
         }
 
-        ImPlot::SetNextLineStyle(IMPLOT_AUTO_COL, 2);
+        ImPlot::SetNextLineStyle(ImColor(0.3f, 0.5f, 0.7f, 1.0f), 2);
+
         if (selected_mode == AccelMode_CustomCurve) {
             bool is_hovered = false, is_pressed = false, is_held = false;
             bool is_interacting_with_points = false;
@@ -377,79 +459,187 @@ int OnGui() {
             static ImVec2 held_point_start_pos = {0, 0};
             static int held_point = -1;
             static int last_held_point = -1;
+            int hovered_point = -1;
 
             auto& points = params[selected_mode].custom_curve_points;
             auto& control_points = params[selected_mode].custom_curve_control_points;
 
-            // Draw lines between control and Bezier points
-            ImPlot::PushPlotClipRect();
-            for (int i = 0; i < points.size()-1; ++i) {
-                auto& p = points[i];
-                ImVec2 p1 = ImPlot::PlotToPixels(p);
-                ImVec2 p2 = ImPlot::PlotToPixels(points[(i + 1) % points.size()]);
-                ImVec2 pc1 = ImPlot::PlotToPixels(control_points[i][0]);
-                ImVec2 pc2 = ImPlot::PlotToPixels(control_points[i][1]);
-                ImPlot::GetPlotDrawList()->AddLine(p1, pc1, ImColor(0.7, 0.1f, 0.8, 1.0));
-                ImPlot::GetPlotDrawList()->AddLine(p2, pc2, ImColor(0.7, 0.1f, 0.8, 1.0));
-            }
-            ImPlot::PopPlotClipRect();
+            if (!points.empty()) {
+                // Draw lines between control and Bezier points
+                if (show_custom_curve_control_points) {
+                    ImPlot::PushPlotClipRect();
+                    for (int i = 0; i < points.size()-1; ++i) {
+                        auto& p = points[i];
+                        ImVec2 p1 = ImPlot::PlotToPixels(p);
+                        ImVec2 p2 = ImPlot::PlotToPixels(points[(i + 1) % points.size()]);
+                        ImVec2 pc1 = ImPlot::PlotToPixels(control_points[i][0]);
+                        ImVec2 pc2 = ImPlot::PlotToPixels(control_points[i][1]);
 
-            // Draw Bezier points
-            for (int i = 0; i < points.size(); ++i) {
-                auto& p = points[i];
-                // char _buf[12];
-                // sprintf(_buf, "P%i", i);
-                // ImPlot::PlotText(_buf, p.x, p.y);
-                // unique even id
-                modified |= ImPlot::DragPoint(i*2,&p.x,&p.y, ImVec4(0,0.9f,0,1),4, ImPlotDragToolFlags_None, &is_pressed, &is_hovered, &is_held);
-                is_interacting_with_points |= is_pressed || is_held || is_hovered;
-
-                if (is_held)
-                    held_point = i;
-                else if (held_point == i)
-                    held_point = -1;
-
-                // ImGui::PushID(i*2);
-                // if (ImGui::BeginPopupContextItem("BezPoint")) {
-                //     if (ImGui::Button("Remove")) {
-                //         points.erase(points.begin()+i-1);
-                //         control_points.erase(control_points.begin()+i);
-                //         modified = true;
-                //     }
-                //     ImGui::EndPopup();
-                // }
-                // ImGui::PopID();
-            }
-
-            if (held_point >= 0) {
-                ImVec2 drag = ImPlot::GetPlotMousePos() - held_point_start_pos;
-                held_point_start_pos = ImPlot::GetPlotMousePos();
-                if (last_held_point != -1) {
-                    //printf("held drag = (%.2f, %.2f)\n", drag.x, drag.y);
-                    // Apply the Bezier point drag to it's control points
-                    if (held_point == 0) {
-                        control_points[0][0] += drag;
+                        ImPlot::GetPlotDrawList()->AddLine(p1, pc1, ImColor(0.7, 0.1f, 0.8, 0.8));
+                        ImPlot::GetPlotDrawList()->AddLine(p2, pc2, ImColor(0.7, 0.1f, 0.8, 0.8));
                     }
-                    else if (held_point == points.size() - 1) {
-                        control_points[held_point-1][1] += drag;
+                    ImPlot::PopPlotClipRect();
+                }
+
+                // Draw Bezier points
+                for (int i = 0; i < points.size(); ++i) {
+                    auto& p = points[i];
+                    float p_min = i > 0 ? points[i-1].x + 0.5f : 0;
+                    float p_max = i < points.size() - 1 ? points[i+1].x - 0.5f : 1000;
+                    // char _buf[12];
+                    // sprintf(_buf, "P%i", i);
+                    // ImPlot::PlotText(_buf, p.x, p.y);
+                    // unique even id
+                    ImGui::PushID(i*1512 + 22);
+                    modified |= ImPlot::DragPoint(i*2,&p.x,&p.y, ImVec4(0,0.9f,0,1),4, ImPlotDragToolFlags_None, &is_pressed, &is_hovered, &is_held);
+                    is_interacting_with_points |= is_pressed || is_held || is_hovered;
+
+                    if (is_held) {
+                        p.x = std::clamp(p.x, p_min, p_max);
                     }
-                    else {
-                        control_points[held_point][0] += drag;
-                        control_points[held_point-1][1] += drag;
+
+                    if (is_hovered)
+                        hovered_point = i;
+
+                    if (is_held)
+                        held_point = i;
+                    else if (held_point == i)
+                        held_point = -1;
+
+                    auto old_cursor_pos = ImGui::GetCursorPos();
+                    ImVec2 pos = ImPlot::PlotToPixels(p.x,p.y,IMPLOT_AUTO,IMPLOT_AUTO);
+                    ImGui::SetCursorPos(pos - ImVec2(5, 5));
+                    ImGui::InvisibleButton("#invBt", {10, 10});
+                    ImGui::SetCursorPos(old_cursor_pos);
+
+                    if (ImGui::BeginPopupContextItem()) {
+                        char buf[12];
+                        sprintf(buf, "P #%d", i);
+                        ImGui::SeparatorText(buf);
+                        bool drag_changed = false;
+                        ImVec2 p_before = p;
+                        ImGui::Checkbox("Lock control", &p.is_locked);
+                        ImGui::SetItemTooltip("Control points won't be updated when smoothing");
+                        ImGui::BeginGroup();
+                        ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
+                        drag_changed |= ImGui::DragFloat("##pos1x", &p.x, 0.5, p_min, p_max);
+                        ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
+                        drag_changed |= ImGui::DragFloat("##pos1y", &p.y, 0.01, 0, 10);
+                        ImGui::PopItemWidth();
+                        ImGui::EndGroup();
+                        modified |= drag_changed;
+                        if (drag_changed) {
+                            ImVec2 drag = p - p_before;
+
+                            //printf("held drag = (%.2f, %.2f)\n", drag.x, drag.y);
+                            // Apply the Bezier point drag to it's control points
+                            if (i == 0) {
+                                control_points[0][0] += drag;
+                            }
+                            else if (i == points.size() - 1) {
+                                control_points[i-1][1] += drag;
+                            }
+                            else {
+                                control_points[i][0] += drag;
+                                control_points[i-1][1] += drag;
+                            }
+
+                        }
+                        if (points.size() > 1)
+                            for (int j = (i == points.size() - 1 || i == 0) ? 0 : 1; j >= 0; j--) {
+                                ImGui::PushID(j);
+                                ImGui::BeginGroup();
+                                ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
+                                auto& p1 = control_points[i == points.size() - 1 ? (i-1) : (i-j)][i == 0 ? 0 : i == points.size() - 1 ? 1 : j];
+                                // p.x = std::clamp(p.x, i > 0 ? points[i-1].x + 0.5f : 0, i < points.size() - 1 ? points[i+1].x - 0.5f : 1000);
+                                modified |= ImGui::DragFloat("##pos2x", &p1.x, 0.5, p_min, p_max);
+                                ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
+                                modified |= ImGui::DragFloat("##pos2y", &p1.y, 0.01, 0, 10);
+                                ImGui::PopItemWidth();
+                                ImGui::EndGroup();
+                                ImGui::PopID();
+                            }
+                        if (ImGui::Button("Remove", {-1, 0})) {
+                            points.erase(points.begin()+i);
+                            if (!points.empty()) {
+                                if (i > 0 && i != points.size()) {
+                                    std::swap(control_points[i-1][1], control_points[i][1]);
+                                }
+                                control_points.erase(control_points.begin()+i);
+                            }
+                            modified = true;
+                            ImGui::CloseCurrentPopup();
+                        }
+                        ImGui::EndPopup();
+                    }
+                    ImGui::PopID();
+                }
+
+
+                // Move control points with main points
+                if (held_point >= 0) {
+                    ImVec2 drag = points[held_point] - held_point_start_pos;
+                    held_point_start_pos = points[held_point];
+                    if (last_held_point != -1) {
+                        //printf("held drag = (%.2f, %.2f)\n", drag.x, drag.y);
+
+                        if (move_control_points_along) {
+                            // Apply the Bezier point drag to it's control points
+                            if (held_point == 0) {
+                                control_points[0][0] += drag;
+                            }
+                            else if (held_point == points.size() - 1) {
+                                control_points[held_point-1][1] += drag;
+                            }
+                            else {
+                                control_points[held_point][0] += drag;
+                                control_points[held_point-1][1] += drag;
+                            }
+                        }
+
+                        // Apply constraints to the control point
+                        // if (held_point < points.size() - 1)
+                        //     control_points[held_point][0].x = std::clamp(control_points[held_point][0].x, points[held_point].x + CURVE_POINTS_MARGIN, held_point < points.size() - 1 ? points[held_point+1].x - CURVE_POINTS_MARGIN : 1000);
+                        // if (held_point > 0)
+                        //     control_points[held_point-1][1].x = std::clamp(control_points[held_point-1][1].x, points[held_point-1].x + CURVE_POINTS_MARGIN, held_point < points.size() - 1 ? points[held_point].x - CURVE_POINTS_MARGIN : 1000);
+
+                        if (held_point < points.size() - 1)
+                            control_points[held_point][0].x = std::clamp(control_points[held_point][0].x,
+                                points[held_point].x + CURVE_POINTS_MARGIN, points[held_point+1].x - CURVE_POINTS_MARGIN);
+                        if (held_point > 0)
+                            control_points[held_point-1][1].x = std::clamp(control_points[held_point-1][1].x,
+                                points[held_point-1].x + CURVE_POINTS_MARGIN,  points[held_point].x - CURVE_POINTS_MARGIN);
                     }
                 }
-            }
 
-            // Draw control points
-            for (int i = 0; i < control_points.size(); ++i) {
-                for (int j = 0; j < 2; j++) {
-                    auto& p = control_points[i][j];
-                    // char _buf[12];
-                    // sprintf(_buf, "P(%d, %d)", i, j);
-                    // ImPlot::PlotText(_buf, p.x, p.y);
-                    // unique odd id
-                    modified |= ImPlot::DragPoint(i * 4 + j * 2 + 1,&p.x,&p.y, ImVec4(0,0.5f,1,1),4, ImPlotDragToolFlags_None, &is_pressed, &is_hovered, &is_held);
-                    is_interacting_with_points |= is_pressed || is_held || is_hovered;
+                /// 15.608,1,40,1.75,69,2.2,130,2.2
+
+                // Draw control points
+                if (show_custom_curve_control_points && points.size() > 1) {
+                    for (int i = 0; i < control_points.size(); ++i) {
+                        for (int j = 0; j < 2; j++) {
+                            bool is_point_hovered = hovered_point != -1 && ((i == hovered_point && j == 0) || (i == hovered_point - 1 && j == 1));
+                            is_point_hovered |= held_point != -1 && ((i == held_point && j == 0) || (i == held_point - 1 && j == 1));
+                            bool is_point_locked = points[i+j].is_locked;//(points[i].is_locked && j == 0) || (points[i+1].is_locked && j == 1);
+                            auto& p = control_points[i][j];
+                            // char _buf[12];
+                            // sprintf(_buf, "P(%d, %d)", i, j);
+                            // ImPlot::PlotText(_buf, p.x, p.y);
+                            // unique odd id
+
+                            modified |= ImPlot::DragPoint(i * 4 + j * 2 + 1,&p.x,&p.y,
+                                is_point_locked ? ImVec4(is_point_hovered ? 0.4 : 0.3, 0.7f, 0.8, 1) : ImVec4(is_point_hovered ? 0.3 : 0,0.5f,1, 1),
+                                is_point_hovered ? 5 : 4, ImPlotDragToolFlags_None, &is_pressed, &is_hovered, &is_held);
+                            is_interacting_with_points |= is_pressed || is_held || is_hovered;
+
+                            if (is_held) {
+                                if (j == 1)
+                                    p.x = std::clamp(p.x, points[i].x + CURVE_POINTS_MARGIN, i < points.size() - 1 ? points[i+1].x - CURVE_POINTS_MARGIN : 1000);
+                                else
+                                    p.x = std::clamp(p.x, points[i].x + CURVE_POINTS_MARGIN, i < points.size() - 1 ? points[i+1].x - CURVE_POINTS_MARGIN : 1000);
+                            }
+                        }
+                    }
                 }
             }
 
@@ -461,9 +651,8 @@ int OnGui() {
             if (ImGui::IsMouseReleased(0) && !is_interacting_with_points && !ImGui::IsMouseDragging(0) && !ImPlot::GetCurrentPlot()->Held && mouse_pos == ImGui::GetMousePos() && ImPlot::IsPlotHovered()) {
                 auto m_pos = ImPlot::GetPlotMousePos();
 
-                int best_idx = 0;
+                int best_idx = -1;
                 if (points.size() >= 1) {
-                    best_idx = -1;
                     for (int i = points.size()-1; i >= 0; i--) {
                         if (points[i].x < m_pos.x) {
                             best_idx = i;
@@ -472,32 +661,85 @@ int OnGui() {
                     }
                 }
 
-                points.insert(points.begin() + best_idx + 1, m_pos);
-                control_points.insert(control_points.begin() + std::max(best_idx, 0), {m_pos + ImPlotPoint(-10, 0), m_pos + ImPlotPoint(10, 0)});
+                points.insert(points.begin() + best_idx + 1, static_cast<Ex_Vec2>(m_pos));
 
-                if (best_idx == -1) {
-                    control_points[0][0] = points[1] - ImPlotPoint(10, 0);
-                    std::swap(control_points[0][0], control_points[0][1]);
-                }
-                else if (points.size() >= 2 && best_idx == points.size() - 2) {  // points.size() - 2 because we changed points' size right before
-                    std::swap(control_points[best_idx][0], control_points[best_idx][1]);
-                    control_points[best_idx][0] = points[best_idx] + ImPlotPoint(10, 0);
-                }
-                else {
-                    std::swap(control_points[best_idx][0], control_points[best_idx + 1][0]);
-                    std::swap(control_points[best_idx + 1][0], control_points[best_idx][1]);
+                if (points.size() > 1) {
+
+                    if (best_idx == -1) {
+                        control_points.insert(control_points.begin(), {m_pos + ImPlotPoint(4, 0), points[1] - ImPlotPoint(4, 0)});
+                    }
+                    else if (points.size() >= 2 && best_idx == points.size() - 2) {  // points.size() - 2 because we changed points' size right before
+                        control_points.insert(control_points.begin() + best_idx, {points[best_idx] + ImPlotPoint(4, 0), m_pos - ImPlotPoint(4, 0)});
+                        // std::swap(control_points[best_idx][0], control_points[best_idx][1]);
+                        // control_points[best_idx][0] = points[best_idx] + ImPlotPoint(10, 0);
+                    }
+                    else {
+                        auto cur_point = points[best_idx+1];
+                        auto prev_point = points[best_idx] - cur_point;
+                        auto next_point = points[best_idx+2] - cur_point;
+
+                        auto len_prev = std::sqrt(ImLengthSqr(prev_point)), len_next = std::sqrt(ImLengthSqr(next_point));
+
+                        auto dir = next_point * (len_prev / len_next) - prev_point;
+                        dir = dir / std::sqrt(ImLengthSqr(dir));
+
+                        control_points.insert(control_points.begin() + best_idx, {m_pos + (-dir * (len_prev / 3)), m_pos + dir * (len_next / 3)});
+
+                        std::swap(control_points[best_idx][0], control_points[best_idx + 1][0]);
+                        std::swap(control_points[best_idx + 1][0], control_points[best_idx][1]);
+                    }
+
+                    params[selected_mode].ApplyCurveConstraints();
                 }
 
                 modified = true;
             }
 
-            if (modified)
+            if (modified) {
+                params[selected_mode].ApplyCurveConstraints();
+                params[selected_mode].ExportCurveToLUT();
                 functions[selected_mode].PreCacheFunc();
+            }
+
+            // Draw the curve (FOR DEBUG)
+            if (points.size() > 1) {
+                ImPlotPoint* B = nullptr; // could move to a static vector
+                const int BEZIER_FRAG_SEGMENTS = 50;
+                B = new ImPlotPoint[(points.size() - 1) * BEZIER_FRAG_SEGMENTS];
+                ImVec2 last_point = points[0];
+                for (int i = 0; i < points.size() - 1; i++) {
+                    for (int j = 0; j < BEZIER_FRAG_SEGMENTS; ++j) {
+                        float t  = (float)j / (BEZIER_FRAG_SEGMENTS - 1);
+                        ImVec2 p = ImBezierCubicCalc(points[i], control_points[i][0], control_points[i][1], points[i+1], t);
+                        // float x = (1-t)*(1-t)*(1-t)*points[i].x + 3*(1-t)*(1-t)*t*control_points[i][0].x + 3*(1-t)*t*t*control_points[i][1].x + t*t*t*points[i+1].x;
+                        B[i * BEZIER_FRAG_SEGMENTS + j] = p;
+                        if (last_point.x > p.x) {
+                            // Bad Curve
+                        }
+                        last_point = p;
+                    }
+                }
+
+                ImPlot::PlotLine("##bez",&B[0].x, &B[0].y, (points.size() - 1) * BEZIER_FRAG_SEGMENTS, 0, 0, sizeof(ImPlotPoint));
+
+                delete[] B;
+
+                // ImPlot::SetNextMarkerStyle(-1, 2);
+                // // Draw LUT points
+                // ImPlot::PlotScatterG("LUT points", [](int idx, void* ud) {
+                //     double x = reinterpret_cast<double*>(ud)[idx];
+                //     double y = reinterpret_cast<double*>(ud + sizeof(double) * MAX_LUT_ARRAY_SIZE)[idx];
+                //     return ImPlotPoint(x, y);
+                // }, params[selected_mode].LUT_data_x, params[selected_mode].LUT_size);
+            }
+
+            // ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS,
+            //              functions[selected_mode].x_stride);
 
             last_held_point = held_point;
         }
-
-        ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS,
+        //else
+            ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS,
                          functions[selected_mode].x_stride);
 
         ImPlot::PlotScatterG("Mouse Speed", [](int idx, void *data) { return *(ImPlotPoint *) data; }, &mousePoint_main,
