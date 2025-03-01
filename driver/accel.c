@@ -357,25 +357,28 @@ int accelerate(int *x, int *y, int *wheel)
             }
         }
 
-        // LUT (Look-Up-Table)
-        else if(g_AccelerationMode == 6) {
+        // LUT (Look-Up-Table) / Custom Curve
+        else if(g_AccelerationMode == 6 || g_AccelerationMode == 7) {
             // Assumes the size and values are valid. Please don't change LUT parameters by hand.
 
             if(speed < g_LutData_x[0]) // Check if the speed is below the first given point
                 speed = g_LutData_y[0];
             else {
-                int l = 0, r = g_LutSize - 2;
-                while (l < r) {
+                int l = 0, r = g_LutSize - 1, best_point = r, iter = 0; // We REALLY don't want an infinity loop in kernel
+                while (l <= r && iter < 10) {
                     int mid = (r + l) / 2;
 
                     if (speed > g_LutData_x[mid]) {
                         l = mid + 1;
                     } else {
+                        best_point = mid;
                         r = mid - 1;
                     }
+
+                    iter++;
                 }
 
-                int index = r;
+                int index = best_point-1;
 
                 FP_LONG p = g_LutData_y[index];
                 FP_LONG p1 = g_LutData_y[index + 1];

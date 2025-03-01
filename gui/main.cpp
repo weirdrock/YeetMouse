@@ -7,6 +7,7 @@
 #include "ImGuiExtensions.h"
 #include "ConfigHelper.h"
 #include <chrono>
+#include <vector>
 
 #include "External/ImGui/imgui_internal.h"
 #include "External/ImGui/implot_internal.h"
@@ -17,7 +18,7 @@
  * + Config export/import (from and to clipboard) in a human readable format or config.h
  * + Anisotropy
  * + Angle snapping
- * - Fully customizable curves (from polynomials)
+ * + Fully customizable curves (from polynomials)
  * - Clean up the parameter formatting to allow for different precisions
  */
 
@@ -47,7 +48,7 @@ int OnGui() {
 
     static float mouse_smooth = 0.75;
     static steady_clock::time_point last_apply_clicked;
-    static bool show_custom_curve_control_points = true, move_control_points_along = false;
+    static bool show_custom_curve_control_points = true, move_control_points_along = false, show_custom_curve_LUT_points = false;
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -265,18 +266,18 @@ int OnGui() {
                 break;
             case AccelMode_CustomCurve: {
                 if (ImGui::Button("Smooth Curve", {-1, 0})) {
-                    functions[selected_mode].SmoothBezier();
+                    params[selected_mode].customCurve.SmoothBezier();
                     change |= true;
                 }
-                ImGui::SetItemTooltip("Applies smoothing to the curve without moving the points");
+                ImGui::SetItemTooltip("Applies smoothing to the curve without moving the base (yellow) points");
 
                 ImGui::Checkbox("Show Control Points", &show_custom_curve_control_points);
 
                 ImGui::Checkbox("Link Control Points", &move_control_points_along);
                 ImGui::SetItemTooltip("Moves control points along with it's parent curve point");
 
-                auto& points = params[selected_mode].custom_curve_points;
-                auto& control_points = params[selected_mode].custom_curve_control_points;
+                auto& points = params[selected_mode].customCurve.points;
+                auto& control_points = params[selected_mode].customCurve.control_points;
 
                 ImGui::Unindent();
                 for (int i = 0; i < points.size(); ++i) {
@@ -289,9 +290,16 @@ int OnGui() {
                         bool drag_changed = false;
                         ImGui::BeginGroup();
                         ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
+// Sliders don't work too well here, so I decided to stick with drag sliders
+//#ifdef USE_INPUT_DRAG
                         drag_changed |= ImGui::DragFloat("##pos1x", &p.x, 0.5, p_min, p_max);
                         ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
                         drag_changed |= ImGui::DragFloat("##pos1y", &p.y, 0.01, 0, 10);
+// #else
+//                         drag_changed |= ImGui::SliderFloat("##pos1x", &p.x, p_min, p_max);
+//                         ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
+//                         drag_changed |= ImGui::SliderFloat("##pos1y", &p.y, 0, 10);
+// #endif
                         ImGui::PopItemWidth();
                         ImGui::EndGroup();
 
@@ -334,9 +342,13 @@ int OnGui() {
                 }
                 ImGui::Indent();
 
+                ImGui::SeparatorText("LUT Export");
+                ImGui::Checkbox("Show LUT Points", &show_custom_curve_LUT_points);
+
                 if (change) {
-                    params[selected_mode].ApplyCurveConstraints();
-                    params[selected_mode].ExportCurveToLUT();
+                    params[selected_mode].customCurve.ApplyCurveConstraints();
+                    params[selected_mode].LUT_size = params[selected_mode].customCurve.ExportCurveToLUT(params[selected_mode].LUT_data_x, params[selected_mode].LUT_data_y);
+                    params[selected_mode].customCurve.UpdateLUT();
                 }
 
                 break;
@@ -398,6 +410,7 @@ int OnGui() {
     // Calculate everything about the mouse speed
     static float recent_mouse_top_speed = 0;
     static steady_clock::time_point last_time_speed_record_broken = steady_clock::now();
+    static steady_clock::time_point last_probe_time = steady_clock::now();
     static float last_frame_speed = 0;
     static ImVec2 last_mouse_pos = {0, 0};
     double mouse_pos[2];
@@ -405,8 +418,11 @@ int OnGui() {
     ImVec2 mouse_delta = {
         static_cast<float>(mouse_pos[0] - last_mouse_pos.x), static_cast<float>(mouse_pos[1] - last_mouse_pos.y)
     };
-    float mouse_speed = sqrtf(mouse_delta.x * mouse_delta.x + (mouse_delta.y * mouse_delta.y));
-    mouse_speed = mouse_speed / ImGui::GetIO().DeltaTime / 1000 / params[0].sens;
+    float mouse_speed = std::sqrt(ImLengthSqr(mouse_delta));
+    mouse_speed = mouse_speed / std::chrono::duration_cast<milliseconds>(steady_clock::now() - last_probe_time).count();
+    mouse_speed /= functions[0].EvalFuncAt(mouse_speed); // Normalize in regard to acceleration (to get raw speed)
+    // It's a rough approximation because in the time of 1 frame, tens of mouse packets can be received (thus "accelerated").
+    last_probe_time = steady_clock::now();
     if (mouse_speed > recent_mouse_top_speed) {
         recent_mouse_top_speed = mouse_speed;
         last_time_speed_record_broken = steady_clock::now();
@@ -418,6 +434,7 @@ int OnGui() {
                                                                  avg_speed - params[selected_mode].offset));
 
     last_mouse_pos = {(float) mouse_pos[0], (float) mouse_pos[1]};
+
 
     last_frame_speed = avg_speed;
 
@@ -461,8 +478,8 @@ int OnGui() {
             static int last_held_point = -1;
             int hovered_point = -1;
 
-            auto& points = params[selected_mode].custom_curve_points;
-            auto& control_points = params[selected_mode].custom_curve_control_points;
+            auto& points = params[selected_mode].customCurve.points;
+            auto& control_points = params[selected_mode].customCurve.control_points;
 
             if (!points.empty()) {
                 // Draw lines between control and Bezier points
@@ -612,8 +629,6 @@ int OnGui() {
                     }
                 }
 
-                /// 15.608,1,40,1.75,69,2.2,130,2.2
-
                 // Draw control points
                 if (show_custom_curve_control_points && points.size() > 1) {
                     for (int i = 0; i < control_points.size(); ++i) {
@@ -689,48 +704,36 @@ int OnGui() {
                         std::swap(control_points[best_idx + 1][0], control_points[best_idx][1]);
                     }
 
-                    params[selected_mode].ApplyCurveConstraints();
+                    params[selected_mode].customCurve.ApplyCurveConstraints();
                 }
 
                 modified = true;
             }
 
             if (modified) {
-                params[selected_mode].ApplyCurveConstraints();
-                params[selected_mode].ExportCurveToLUT();
+                params[selected_mode].customCurve.ApplyCurveConstraints();
+                params[selected_mode].LUT_size = params[selected_mode].customCurve.ExportCurveToLUT(params[selected_mode].LUT_data_x, params[selected_mode].LUT_data_y);
+                params[selected_mode].customCurve.UpdateLUT();
                 functions[selected_mode].PreCacheFunc();
             }
 
-            // Draw the curve (FOR DEBUG)
+            // Draw the curve
             if (points.size() > 1) {
-                ImPlotPoint* B = nullptr; // could move to a static vector
-                const int BEZIER_FRAG_SEGMENTS = 50;
-                B = new ImPlotPoint[(points.size() - 1) * BEZIER_FRAG_SEGMENTS];
-                ImVec2 last_point = points[0];
-                for (int i = 0; i < points.size() - 1; i++) {
-                    for (int j = 0; j < BEZIER_FRAG_SEGMENTS; ++j) {
-                        float t  = (float)j / (BEZIER_FRAG_SEGMENTS - 1);
-                        ImVec2 p = ImBezierCubicCalc(points[i], control_points[i][0], control_points[i][1], points[i+1], t);
-                        // float x = (1-t)*(1-t)*(1-t)*points[i].x + 3*(1-t)*(1-t)*t*control_points[i][0].x + 3*(1-t)*t*t*control_points[i][1].x + t*t*t*points[i+1].x;
-                        B[i * BEZIER_FRAG_SEGMENTS + j] = p;
-                        if (last_point.x > p.x) {
-                            // Bad Curve
-                        }
-                        last_point = p;
-                    }
+
+                ImPlot::PlotLine("##bez",&params[selected_mode].customCurve.LUT_points[0].x, &params[selected_mode].customCurve.LUT_points[0].y, (points.size() - 1) * BEZIER_FRAG_SEGMENTS, 0, 0, sizeof(ImPlotPoint));
+
+                if (show_custom_curve_LUT_points) {
+                    ImPlot::SetNextMarkerStyle(-1, 2);
+                    // Draw LUT points
+                    ImPlot::PlotScatterG("LUT points", [](int idx, void* ud) {
+                        double x = static_cast<Parameters*>(ud)->LUT_data_x[idx];
+                        double y = static_cast<Parameters*>(ud)->LUT_data_y[idx];
+                        return ImPlotPoint(x, y);
+                    }, &params[selected_mode], params[selected_mode].LUT_size);
+
+                    ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS,
+                        functions[selected_mode].x_stride);
                 }
-
-                ImPlot::PlotLine("##bez",&B[0].x, &B[0].y, (points.size() - 1) * BEZIER_FRAG_SEGMENTS, 0, 0, sizeof(ImPlotPoint));
-
-                delete[] B;
-
-                // ImPlot::SetNextMarkerStyle(-1, 2);
-                // // Draw LUT points
-                // ImPlot::PlotScatterG("LUT points", [](int idx, void* ud) {
-                //     double x = reinterpret_cast<double*>(ud)[idx];
-                //     double y = reinterpret_cast<double*>(ud + sizeof(double) * MAX_LUT_ARRAY_SIZE)[idx];
-                //     return ImPlotPoint(x, y);
-                // }, params[selected_mode].LUT_data_x, params[selected_mode].LUT_size);
             }
 
             // ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS,
@@ -738,7 +741,7 @@ int OnGui() {
 
             last_held_point = held_point;
         }
-        //else
+        else
             ImPlot::PlotLine("##ActivePlot", functions[selected_mode].values, PLOT_POINTS,
                          functions[selected_mode].x_stride);
 
@@ -822,6 +825,9 @@ void ResetParameters(void) {
     for (int mode = 0; mode < NUM_MODES; mode++) {
         params[mode] = start_params;
         params[mode].accelMode = static_cast<AccelMode>(mode == 0 ? used_mode : mode);
+        if (mode == AccelMode_CustomCurve) {
+            params[mode].accelMode = AccelMode_Lut; // Custom curve is save just like LUT, the only distinction is on the GUI side
+        }
 
         if (mode == 6) {
             memcpy(params[mode].LUT_data_x, start_params.LUT_data_x,
@@ -841,6 +847,12 @@ void ResetParameters(void) {
 
         if (mode == 2)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.1);
+
+        if (mode == AccelMode_CustomCurve) {
+            params->customCurve.ApplyCurveConstraints();
+            params[mode].LUT_size = params[mode].customCurve.ExportCurveToLUT(params[mode].LUT_data_x, params[mode].LUT_data_y);
+            params[mode].customCurve.UpdateLUT();
+        }
 
         functions[mode] = CachedFunction(((float) PLOT_X_RANGE) / PLOT_POINTS, &params[mode]);
         //printf("stride = %f\n", functions[mode].x_stride);

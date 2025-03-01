@@ -54,6 +54,7 @@ float CachedFunction::EvalFuncAt(float x) {
             }
             break;
         }
+        case AccelMode_CustomCurve:
         case AccelMode_Lut: // LUT
         {
             if(params->LUT_size == 0)
@@ -106,77 +107,6 @@ float CachedFunction::EvalFuncAt(float x) {
 
             // Interpolate between p and p+1 elements
             val = LERP(p, p1, frac);
-            break;
-        }
-        case AccelMode_CustomCurve:
-        {
-
-
-            // Just do exactly what's done in LUT
-            if(params->LUT_size == 0)
-                break;
-
-            if(x < params->LUT_data_x[0]) {
-                val = params->LUT_data_y[0];
-                break;
-            }
-
-            // Binary Search for the closest value smaller than x, so the n+1 value is greater than x
-            int l = 0, r = params->LUT_size - 1;
-            int best_point = params->LUT_size - 1;
-            while (l <= r) {
-                int mid = (r + l) / 2;
-
-                if (x > params->LUT_data_x[mid]) {
-                    l = mid + 1;
-                } else {
-                    best_point = mid;
-                    r = mid - 1;
-                }
-            }
-
-            l = best_point-1;
-            //printf("Found best x (for %f) idx: %i (%f), val: %f\n", x, l, params->LUT_data_x[l], params->LUT_data_y[l]);
-
-            int pos = l;//std::min(l, (int)params->LUT_size - 2);
-            float p = params->LUT_data_y[(int)(pos)]; // p element
-            float p1 = params->LUT_data_y[(int)(pos) + 1]; // p + 1 element
-
-            // derived from this (lerp): frac * params->LUT_data_x[l + 1] + params->LUT_data_x[l] = x
-            float frac = (x - params->LUT_data_x[l]) / (params->LUT_data_x[l + 1] - params->LUT_data_x[l]);
-
-            // Interpolate between p and p+1 elements
-            val = LERP(p, p1, frac);
-            break;
-
-
-
-            // // find the closes curve point
-            // auto& points = params->custom_curve_points;
-            // auto& control_points = params->custom_curve_control_points;
-            // if (points.size() < 2)
-            //     break;
-            // int best_idx = 0;
-            // for (int i = points.size()-2; i >= 0; i--) {
-            //     if (points[i].x < x) {
-            //         best_idx = i;
-            //         break;
-            //     }
-            // }
-            //
-            // // val = EvaluateSpline(x, seg);
-            // // break;
-            //
-            // // if (best_idx == -1) {
-            // //     val = 1;
-            // //     break;
-            // // }
-            // // how far between the points are we
-            // float frac = (x - points[best_idx].x) / (points[best_idx + 1].x - points[best_idx].x);
-            // //frac = (x - control_points[best_idx][0].x) / (control_points[best_idx][1].x - control_points[best_idx][0].x);
-            // auto point = ImBezierCubicCalc(points[best_idx], control_points[best_idx][0], control_points[best_idx][1], points[best_idx + 1], frac);
-            // //printf("frac = %f, x = %f, bezier x = %f, f(x) = %f, best_idx = %d\n", frac, x, point.x, point.y, best_idx);
-            // val = point.y;
             break;
         }
         default:
@@ -249,84 +179,4 @@ void CachedFunction::PreCacheFunc() {
             values_y[i] = val / params->sens * params->sensY;
         x += x_stride;
     }
-}
-
-// https://www.codeproject.com/Articles/31859/Draw-a-Smooth-Curve-through-a-Set-of-2D-Points-wit
-void CachedFunction::SmoothBezier() {
-    //bezier_control_points.clear();
-    auto& center_points = params->custom_curve_points;
-    auto& bezier_control_points = params->custom_curve_control_points;
-
-    int n = center_points.size() - 1;
-    if (n < 1) {
-        bezier_control_points.clear();
-        return;
-    }
-
-    if (n == 1) {
-        bezier_control_points.resize(2);
-        // Special case: Bezier curve should be a straight line.
-
-        // 3P1 = 2P0 + P3
-        bezier_control_points[0][0] = (center_points[0] * 2 + center_points[1]) / 3;
-
-        // P2 = 2P1 – P0
-        bezier_control_points[0][1] = bezier_control_points[0][0] * 2 - center_points[0];
-
-        return;
-    }
-
-    center_points.emplace_back(center_points[n] * 2 - center_points[n-1]); // Push dummy point at the end
-
-    n += 1;
-    bezier_control_points.resize(n);
-
-    // Calculate first Bezier control points
-    // Right hand side vector
-    ImVec2 *rhs = new ImVec2[n];
-
-    // Set right hand side X values
-    for (int i = 1; i < n - 1; ++i)
-        rhs[i] = center_points[i] * 4 +  center_points[i + 1] * 2;
-    rhs[0] = center_points[0] + center_points[1] * 2;
-    rhs[n - 1] = (center_points[n - 1] * 8 + center_points[n]) / 2.0;
-    // Get first control points
-
-    ImVec2 *x = new ImVec2[n]; // Solution vector.
-    ImVec2 *tmp = new ImVec2[n]; // Temp workspace.
-
-    ImVec2 b = {2.0, 2.0};
-    x[0] = rhs[0] / b;
-    for (int i = 1; i < n; i++) // Decomposition and forward substitution.
-    {
-        tmp[i] = ImVec2(1, 1) / b;
-        b = (i < n - 1 ? ImVec2(4, 4) : ImVec2(3.5, 3.5)) - tmp[i];
-        x[i] = (rhs[i] - x[i - 1]) / b;
-    }
-    for (int i = 1; i < n; i++)
-        x[n - i - 1] -= tmp[n - i] * x[n - i]; // Backsubstitution.
-
-
-    for (int i = 0; i < n; ++i) {
-        // First control point
-        if (!center_points[i].is_locked)
-            bezier_control_points[i][0] = x[i];
-        // Second control point
-        if (i == n -1 || !center_points[i+1].is_locked)  {
-            if (i < n - 1) {
-                bezier_control_points[i][1] = center_points[i + 1] * 2 - x[i + 1];
-            }
-            else
-                bezier_control_points[i][1] = center_points[n] + x[n - 1] / 2;
-        }
-    }
-
-    center_points.pop_back(); // Pop the back dummy
-    bezier_control_points.pop_back();
-
-    params->ApplyCurveConstraints();
-
-    delete[] rhs;
-    delete[] x;
-    delete[] tmp;
 }

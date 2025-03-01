@@ -3,22 +3,15 @@
 
 #include <cmath>
 #include <string>
-#include <unistd.h>
 #include <filesystem>
 #include <algorithm>
-#include <array>
-#include <deque>
-#include <vector>
 
 #include "External/ImGui/imgui.h"
+#include "CustomCurve.h"
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
 #define DEG2RAD (M_PI / 180.0)
-
-#define CURVE_POINTS_MARGIN 0.2f
-
-struct ImVec2;
 
 namespace DriverHelper {
     bool GetParameterF(const std::string& param_name, float& value);
@@ -121,14 +114,6 @@ inline AccelMode AccelMode_From_String(std::string mode_text) {
         return AccelMode_Current;
 }
 
-struct Ex_Vec2 : ImVec2 {
-    bool is_locked = false;
-
-    Ex_Vec2(float x, float y) : ImVec2(x, y) {}
-    Ex_Vec2(ImVec2 vec) : ImVec2(vec) {}
-    Ex_Vec2() : ImVec2(0, 0) {}
-};
-
 struct Parameters {
     float sens = 1.0f; // Sensitivity for X axis only if sens != sensY (anisotropy is on), otherwise sensitivity for both axes
     float sensY = 1.0f; // Unused when anisotropy is off (sens == sensY)
@@ -154,14 +139,7 @@ struct Parameters {
     double LUT_data_y[MAX_LUT_ARRAY_SIZE];
     int LUT_size = 0;
 
-    // TODO
-    //  fix the custom curve points
-    // Custom Curve (stored as a vector of points for now)
-    std::deque<Ex_Vec2> custom_curve_points { {0, 1}, {100, 1.1} }; // actual points
-    std::deque<std::array<ImVec2, 2>> custom_curve_control_points { std::array<ImVec2, 2>( { ImVec2{0, 2}, ImVec2{100, 0.3} } ) }; // control points
-
-    void ApplyCurveConstraints();
-    void ExportCurveToLUT();
+    CustomCurve customCurve{};
 
     Parameters() = default;
 

@@ -1,7 +1,8 @@
-#include "DriverHelper.h"
-
 #ifndef GUI_FUNCTIONHELPER_H
 #define GUI_FUNCTIONHELPER_H
+
+
+#include "DriverHelper.h"
 
 #define PLOT_POINTS (512)
 #define PLOT_X_RANGE (150)
@@ -20,8 +21,6 @@ public:
 
     float EvalFuncAt(float x);
     void PreCacheFunc();
-
-    void SmoothBezier();
 
 private:
     // Constant parameters for Jump

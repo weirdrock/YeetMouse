@@ -1,5 +1,6 @@
 #include "ConfigHelper.h"
 #include <fstream>
+#include <unistd.h>
 
 char* OpenFile() {
     char* filename = new char[512];
