@@ -156,6 +156,7 @@ unchanged_return:
 #if __cleanup_events
   return out_count;
 #endif
+  return;
 }
 
 static bool driver_match(struct input_handler *handler, struct input_dev *dev) {
