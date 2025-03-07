@@ -8,6 +8,7 @@
 #include "ConfigHelper.h"
 #include <chrono>
 #include <vector>
+#include <unistd.h>
 
 #include "External/ImGui/imgui_internal.h"
 #include "External/ImGui/implot_internal.h"
@@ -579,10 +580,13 @@ int OnGui() {
                         if (ImGui::Button("Remove", {-1, 0})) {
                             points.erase(points.begin()+i);
                             if (!points.empty()) {
-                                if (i > 0 && i != points.size()) {
+                                if (i > 0 && i < points.size()) {
                                     std::swap(control_points[i-1][1], control_points[i][1]);
                                 }
-                                control_points.erase(control_points.begin()+i);
+                                if (i > 0)
+                                    control_points.erase(control_points.begin()+i-1);
+                                else
+                                    control_points.erase(control_points.begin()+i);
                             }
                             modified = true;
                             ImGui::CloseCurrentPopup();
