@@ -5,74 +5,269 @@ with lib;
 let
   cfg = config.hardware.yeetmouse;
 
-  accelerationModeValues = [ "linear" "power" "classic" "motivity" "jump" "lut" ];
+  degToRad = x: x * 0.017453292;
+  floatRange = lower: upper: types.addCheck types.float (x: x >= lower && x <= upper);
+      apply = x: if x != null then x else 0.0;
 
-  modeValueToInt = modeValue:
-    (lists.findFirstIndex
-      (value: modeValue == value) 0 accelerationModeValues) + 1;
+  parameterBasePath = "/sys/module/yeetmouse/parameters";
 
-  parametersType = types.submodule {
+  rotationType = types.submodule {
     options = {
-      AccelerationMode = mkOption {
-        type = types.enum accelerationModeValues;
-        default = "linear";
-        description = "Sets the algorithm to be used for acceleration";
-      };
-      InputCap = mkOption {
-        type = types.float;
+      angle = mkOption {
+        type = floatRange (-180.0) 180.0;
         default = 0.0;
-        description = "Limit the maximum pointer speed before applying acceleration.";
+        apply = degToRad;
+        description = "Rotation adjustment to apply to mouse inputs (in degrees)";
       };
-      Sensitivity = mkOption {
-        type = types.float;
-        default = 1.0;
-        description = "Mouse base sensitivity.";
-      };
-      Acceleration = mkOption {
-        type = types.float;
-        default = 1.0;
-        description = "Mouse acceleration sensitivity.";
-      };
-      OutputCap = mkOption {
-        type = types.float;
+
+      snappingAngle = mkOption {
+        type = floatRange 0.0 179.9;
         default = 0.0;
-        description = "Cap maximum sensitivity.";
+        apply = degToRad;
+        description = "Rotation angle to snap to";
       };
-      Offset = mkOption {
-        type = types.float;
+
+      snappingThreshold = mkOption {
+        type = floatRange 0.0 179.9;
         default = 0.0;
-        description = "Mouse base sensitivity.";
+        apply = degToRad;
+        description = "Threshold until applying snapping angle";
       };
-      Exponent = mkOption {
-        type = types.float;
-        default = 1.0;
-        description = "Exponent for algorithms that use it";
+    };
+  };
+
+  modesType = types.attrTag {
+    linear = mkOption {
+      description = ''
+        Simplest acceleration mode. Accelerates at a constant rate by multiplying acceleration.
+        See [RawAccel: Linear](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#linear)
+      '';
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.0005 1.0;
+            default = 0.15;
+            description = "Linear acceleration multiplier";
+          };
+        };
       };
-      Midpoint = mkOption {
-        type = types.float;
-        default = 6.0;
-        description = "Midpoint for sigmoid function";
+      apply = params: [
+        {
+          value = "1";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+      ];
+    };
+
+    power = mkOption {
+      description = ''
+        Acceleration mode based on an exponent and multiplier as found in Source Engine games.
+        See [RawAccel: Power](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#power)
+      '';
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.0005 5.0;
+            default = 0.15;
+            description = "Power acceleration pre-multiplier";
+          };
+          exponent = mkOption {
+            type = floatRange 0.0005 1.0;
+            default = 0.2;
+            description = "Power acceleration exponent";
+          };
+        };
       };
-      PreScale = mkOption {
-        type = types.float;
-        default = 1.0;
-        description = "Parameter to adjust for the DPI";
+      apply = params: [
+        {
+          value = "2";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.exponent;
+          param = "Exponent";
+        }
+      ];
+    };
+
+    classic = mkOption {
+      description = ''
+        Acceleration mode based on an exponent and multiplier as found in Quake 3.
+        See [RawAccel: Classic](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#power)
+      '';
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.0005 5.0;
+            default = 0.15;
+            apply = toString;
+            description = "Classic acceleration pre-multiplier";
+          };
+          exponent = mkOption {
+            type = floatRange 2.0 5.0;
+            default = 2.0;
+            apply = toString;
+            description = "Classic acceleration exponent";
+          };
+        };
       };
-      RotationAngle = mkOption {
-        type = types.float;
-        default = 0.0;
-        description = "Amount of clockwise rotation (in radians)";
+      apply = params: [
+        {
+          value = "3";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.classic.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.classic.exponent;
+          param = "Exponent";
+        }
+      ];
+    };
+
+    motivity = mkOption {
+      description = ''
+        Acceleration mode based on a sigmoid function with a set mid-point.
+        See [RawAccel: Motivity](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#motivity)
+      '';
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.01 10.0;
+            default = 0.15;
+            apply = toString;
+            description = "Motivity acceleration dividend";
+          };
+          start = mkOption {
+            type = floatRange 0.1 50.0;
+            default = 10.0;
+            apply = toString;
+            description = "Motivity acceleration mid-point";
+          };
+        };
       };
-      UseSmoothing = mkOption {
-        type = types.bool;
-        default = true;
-        description = "Whether to smooth out functions (doesn't apply to all)";
+      apply = params: [
+        {
+          value = "4";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.start;
+          param = "Midpoint";
+        }
+      ];
+    };
+
+    jump = mkOption {
+      description = ''
+        Acceleration mode applying gain above a mid-point.
+        Optionally, the transition mid-point can be smoothened and a smoothness may be applied to the whole sigmoid function.
+        See [RawAccel: Jump](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#jump)
+      '';
+      type = types.submodule {
+        options = {
+          acceleration = mkOption {
+            type = floatRange 0.01 10.0;
+            default = 0.15;
+            description = "Jump acceleration dividend";
+          };
+          midpoint = mkOption {
+            type = floatRange 0.1 50.0;
+            default = 0.15;
+            description = "Jump acceleration mid-point";
+          };
+          smoothness = mkOption {
+            type = floatRange 0.01 1.0;
+            default = 0.2;
+            description = "Jump curve smoothness (smoothness of the applied output curve)";
+          };
+          useSmoothing = mkOption {
+            type = types.bool;
+            default = true;
+            description = "Enable Jump smoothing (whether the transition mid-point is smoothed out into the gain curve";
+            apply = x: if x then "1" else "0";
+          };
+        };
       };
-      ScrollsPerTick = mkOption {
-        type = types.int;
-        default = true;
-        description = "Amount of lines to scroll per scroll-wheel tick.";
+      apply = params: [
+        {
+          value = "5";
+          param = "AccelerationMode";
+        }
+        {
+          value = toString params.acceleration;
+          param = "Acceleration";
+        }
+        {
+          value = toString params.midpoint;
+          param = "Midpoint";
+        }
+        {
+          value = toString params.smoothness;
+          param = "Exponent";
+        }
+        {
+          value = params.useSmoothing;
+          param = "UseSmoothing";
+        }
+      ];
+    };
+
+    lut = let
+      tuple = ts: mkOptionType {
+        name = "tuple";
+        merge = mergeOneOption;
+        check = xs: all id (zipListsWith (t: x: t.check x) ts xs);
+        description = "tuple of" + concatMapStrings (t: " (${t.description})") ts;
       };
+      lutVec = tuple [
+        ((floatRange 0.0 100.0) // { description = "Input speed (x)"; })
+        ((floatRange 0.0 100.0) // { description = "Output speed ratio (y)"; })
+      ];
+    in mkOption {
+      description = ''
+        Acceleration mode following a custom curve.
+        The curve is specified using individual `[x, y]` points.
+        See [RawAccel: Lookup Table](https://github.com/RawAccelOfficial/rawaccel/blob/5b39bb6/doc/Guide.md#look-up-table)
+      '';
+      type = types.submodule {
+        options = {
+          data = mkOption {
+            type = types.listOf lutVec;
+            default = [];
+            apply = ls: map (t: "${toString t[0]},${toString t[1]}") ls;
+            description = "Lookup Table data (a list of `[x, y]` points)";
+          };
+        };
+      };
+      apply = params: [
+        {
+          value = "6";
+          param = "AccelerationMode";
+        }
+        {
+          value = concatStringsSep ";" params.lut.data;
+          param = "LutDataBuf";
+        }
+        {
+          value = length params.lut.data;
+          param = "LutSize";
+        }
+      ];
     };
   };
 
@@ -81,19 +276,120 @@ let
   };
 in {
   options.hardware.yeetmouse = {
-    enable = lib.mkOption {
-      type = lib.types.bool;
+    enable = mkOption {
+      type = types.bool;
       default = false;
       description = "Enable yeetmouse kernel module to add configurable mouse acceleration";
     };
 
-    parameters = lib.mkOption {
-      type = parametersType;
+    sensitivity = let
+      sensitivityValue = floatRange 0.01 10.0;
+      anisotropyValue = types.submodule {
+        description = "Anisotropic sensitivity, separating X and Y movement";
+        options = {
+          x = mkOption {
+            type = sensitivityValue;
+            description = "Horizontal sensitivity";
+          };
+          y = mkOption {
+            type = sensitivityValue;
+            description = "Vertical sensitivity";
+          };
+        };
+      };
+    in mkOption {
+      type = types.either sensitivityValue anisotropyValue;
+      default = 1.0;
+      description = "Mouse base sensitivity";
+      apply = sens: [
+        {
+          value = if isAttrs sens then toString sens.x else toString sens;
+          param = "Sensitivity";
+        }
+        {
+          value = if isAttrs sens then toString sens.y else toString sens;
+          param = "SensitivityY";
+        }
+      ];
+    };
+
+    inputCap = mkOption {
+      type = types.nullOr (floatRange 0.0 200.0);
+      default = null;
+      description = "Limit the maximum pointer speed before applying acceleration";
+      apply = x: {
+        value = if x != null then toString x else "0";
+        param = "InputCap";
+      };
+    };
+
+    outputCap = mkOption {
+      type = types.nullOr (floatRange 0.0 100.0);
+      default = null;
+      description = "Cap maximum sensitivity.";
+      apply = x: {
+        value = if x != null then toString x else "0";
+        param = "OutputCap";
+      };
+    };
+
+    offset = mkOption {
+      type = types.nullOr (floatRange (-50.0) 50.0);
+      default = 0.0;
+      description = "Acceleration curve offset";
+      apply = x: {
+        value = toString x;
+        param = "Offset";
+      };
+    };
+
+    preScale = mkOption {
+      type = floatRange 0.01 10.0;
+      default = 1.0;
+      description = "Parameter to adjust for DPI";
+      apply = x: {
+        value = toString x;
+        param = "PreScale";
+      };
+    };
+
+    rotation = mkOption {
+      type = rotationType;
       default = { };
+      description = "Adjust mouse rotation input and optionally apply a snapping angle";
+      apply = x: [
+        {
+          value = toString x.angle;
+          param = "RotationAngle";
+        }
+        {
+          value = toString x.snappingAngle;
+          param = "AngleSnap_Angle";
+        }
+        {
+          value = toString x.snappingThreshold;
+          param = "AngleSnap_Threshold";
+        }
+      ];
+    };
+
+    mode = mkOption {
+      type = modesType;
+      default = {
+        linear = { };
+      };
+      description = "Acceleration mode to apply and their parameters";
+      apply = params: []
+        ++ (optionals (params ? linear) params.linear)
+        ++ (optionals (params ? power) params.power)
+        ++ (optionals (params ? classic) params.classic)
+        ++ (optionals (params ? motivity) params.motivity)
+        ++ (optionals (params ? jump) params.jump)
+        ++ (optionals (params ? lut) params.lut);
     };
   };
 
-  config = lib.mkIf cfg.enable {
+  config = mkIf cfg.enable {
     nixpkgs.overlays = [ yeetmouseOverlay ];
 
     boot.extraModulePackages = [ yeetmouse ];
@@ -101,19 +397,14 @@ in {
     services.udev = {
       extraRules = let
         echo = "${pkgs.coreutils}/bin/echo";
-        yeetmouseConfig = with cfg.parameters; pkgs.writeShellScriptBin "yeetmouseConfig" ''
-          ${echo} "${toString Acceleration}" > /sys/module/yeetmouse/parameters/Acceleration
-          ${echo} "${toString Exponent}" > /sys/module/yeetmouse/parameters/Exponent
-          ${echo} "${toString InputCap}" > /sys/module/yeetmouse/parameters/InputCap
-          ${echo} "${toString Midpoint}" > /sys/module/yeetmouse/parameters/Midpoint
-          ${echo} "${toString Offset}" > /sys/module/yeetmouse/parameters/Offset
-          ${echo} "${toString OutputCap}" > /sys/module/yeetmouse/parameters/OutputCap
-          ${echo} "${toString PreScale}" > /sys/module/yeetmouse/parameters/PreScale
-          ${echo} "${toString RotationAngle}" > /sys/module/yeetmouse/parameters/RotationAngle
-          ${echo} "${toString Sensitivity}" > /sys/module/yeetmouse/parameters/Sensitivity
-          ${echo} "${toString ScrollsPerTick}" > /sys/module/yeetmouse/parameters/ScrollsPerTick
-          ${echo} "${toString (modeValueToInt AccelerationMode)}" > /sys/module/yeetmouse/parameters/AccelerationMode
-          ${echo} "${if UseSmoothing then "1" else "0"}" > /sys/module/yeetmouse/parameters/UseSmoothing
+        yeetmouseConfig = let
+          globalParams = [ cfg.inputCap cfg.outputCap cfg.offset cfg.preScale ];
+          params = globalParams ++ cfg.sensitivity ++ cfg.rotation ++ cfg.mode;
+          paramToString = entry: ''
+            ${echo} "${entry.value}" > "${parameterBasePath}/${entry.param}"
+          '';
+        in pkgs.writeShellScriptBin "yeetmouseConfig" ''
+          ${concatMapStrings (s: (paramToString s) + "\n") params}
           ${echo} "1" > /sys/module/yeetmouse/parameters/update
         '';
       in ''
