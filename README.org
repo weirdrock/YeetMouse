@@ -79,7 +79,7 @@
    sudo make remove_dkms
    sudo rmmod yeetmouse
    #+end_src
-   (Or you can use the built-in uninstall script like so: =sudo ./uninstall.sh=).
+   (Or you can use the built-in uninstall script like so: =sudo ./uninstall.sh=, this script determines installed driver version automatically).
 
    Unplug and replug your mouse or reboot to have your mice bound back to the generic usbhid.
 * Manual compile, insmod, bind
