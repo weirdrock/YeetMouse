@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Get the installed version of the driver
-installed_version=$(dkms status | grep -oP '^([l|y]eetmouse-driver[\/(, )]) ?\K([0-9.]+)')
+installed_version=$(dkms status -k $(uname -r) | grep -oP '^([l|y]eetmouse-driver[\/(, )]) ?\K([0-9.]+)')
 
 if [[ ! -z "$installed_version" ]] then
 	echo "Driver ($installed_version) already installed, exiting."
