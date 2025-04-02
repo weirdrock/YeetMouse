@@ -10,13 +10,13 @@
 #include <sys/stat.h>
 #include <set>
 
-#define LEETMOUSE_PARAMS_DIR "/sys/module/leetmouse/parameters/"
+#define YEETMOUSE_PARAMS_DIR "/sys/module/yeetmouse/parameters/"
 
 template<typename Ty>
 bool GetParameterTy(const std::string& param_name, Ty &value) {
     try {
         using namespace std;
-        ifstream file(LEETMOUSE_PARAMS_DIR + param_name);
+        ifstream file(YEETMOUSE_PARAMS_DIR + param_name);
 
         if(file.bad())
             return false;
@@ -34,7 +34,7 @@ bool GetParameterTy(const std::string& param_name, Ty &value) {
 bool GetParameterTy(const std::string& param_name, std::string &value) {
     try {
         using namespace std;
-        ifstream file(LEETMOUSE_PARAMS_DIR + param_name);
+        ifstream file(YEETMOUSE_PARAMS_DIR + param_name);
 
         if(file.bad())
             return false;
@@ -55,7 +55,7 @@ template<typename Ty>
 bool SetParameterTy(const std::string& param_name, Ty value) {
     try {
         using namespace std;
-        ofstream file(LEETMOUSE_PARAMS_DIR + param_name);
+        ofstream file(YEETMOUSE_PARAMS_DIR + param_name);
 
         if (file.bad())
             return false;
@@ -94,7 +94,7 @@ namespace DriverHelper {
     bool CleanParameters(int& fixed_num) {
         namespace fs = std::filesystem;
 
-        for (const auto & entry : fs::directory_iterator(LEETMOUSE_PARAMS_DIR)) {
+        for (const auto & entry : fs::directory_iterator(YEETMOUSE_PARAMS_DIR)) {
             std::string str;
             std::ifstream t(entry.path());
             if(!t.is_open() || t.bad() || t.fail())
@@ -171,7 +171,7 @@ namespace DriverHelper {
     bool ValidateDirectory() {
         namespace fs = std::filesystem;
         try {
-            auto dir = fs::directory_entry(LEETMOUSE_PARAMS_DIR);
+            auto dir = fs::directory_entry(YEETMOUSE_PARAMS_DIR);
             if(!dir.exists())
                 return false;
         }
@@ -351,196 +351,4 @@ bool Parameters::SaveAll() {
         res &= DriverHelper::SaveParameters();
 
     return res;
-}
-
-bool ParseInputDir(std::string path, DriverHelper::DeviceInfo& device) {
-    DIR* path_dir = opendir(path.c_str());
-
-    if(path_dir == nullptr)
-        return false;
-
-    // Got a level deeper, as there should only be one folder inside the input/ folder,
-    // called inputXX/, where Xs are digits
-
-    std::string input_dir;
-    struct dirent* ent;
-    while ((ent = readdir(path_dir)) != nullptr) {
-        if(ent->d_type == DT_DIR && strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0) {
-            std::string abs_path = path + "/" + ent->d_name;
-            input_dir = abs_path;
-            break;
-        }
-    }
-
-    if(input_dir.empty())
-        return false;
-
-    std::ifstream file(input_dir + "/name");
-    if(file.bad() || !file.is_open())
-        return false;
-    getline(file, device.full_name);
-    if(device.full_name.empty())
-        return false;
-
-    device.name = device.full_name;
-
-    file.close();
-
-    file = std::ifstream(input_dir + "/id/vendor");
-    if(file.bad() || !file.is_open())
-        return false;
-    if(!(file >> device.manufacturer_id))
-        return false;
-
-    device.manufacturer = decodeVendorId(device.manufacturer_id);
-    if(device.manufacturer == "Unknown")
-        device.manufacturer = "[" + device.manufacturer_id + "]";
-
-    return true;
-}
-
-// Tries to get as much info as possible
-void TryParsePhysicalNode(std::string path, DriverHelper::DeviceInfo& device) {
-    DIR* path_dir = opendir(path.c_str());
-
-    if(path_dir == nullptr)
-        return;
-
-    std::ifstream file = std::ifstream(path + "/manufacturer");
-    if(file.good())
-        getline(file, device.manufacturer);
-
-    file = std::ifstream(path + "/product");
-    if(file.good())
-        getline(file, device.name);
-
-    file = std::ifstream(path + "/bMaxPower");
-    if(file.good())
-        getline(file, device.max_power);
-}
-
-std::vector<DriverHelper::DeviceInfo> DriverHelper::DiscoverDevices() {
-
-    // Enumerate all USB devices
-    std::vector<std::string> devices_paths;
-    std::vector<DriverHelper::DeviceInfo> devices;
-    try {
-        DIR *dir = opendir("/sys/bus/usb/devices");
-        if (!dir) {
-            std::cerr << "Failed to open /sys/bus/usb/devices" << std::endl;
-            return {};
-        }
-
-        struct dirent *ent;
-        while ((ent = readdir(dir)) != nullptr) {
-            try {
-                //printf("ent = %s\n", ent->d_name);
-                if ((ent->d_type == DT_DIR || ent->d_type == DT_LNK) && strcmp(ent->d_name, ".") != 0 &&
-                    strcmp(ent->d_name, "..") != 0) {
-                    std::string path = std::string("/sys/bus/usb/devices/") + ent->d_name;
-                    struct stat st{0};
-                    if (stat(path.c_str(), &st) == 0 && S_ISDIR(st.st_mode)) {
-                        devices_paths.emplace_back(ent->d_name);
-                    }
-                }
-            }
-            catch (std::exception &ex) {
-                printf("Error discovering device: %s\n", ex.what());
-                continue;
-            }
-        }
-        closedir(dir);
-    }
-    catch (std::exception& ex) {
-        printf("Could not enumerate the devices: %s\n", ex.what());
-        return {};
-    }
-    struct dirent *ent;
-
-    //printf("found %zu devices\n", devices_paths.size());
-
-    // Iterate over devices_paths
-    for (const auto& device : devices_paths) {
-        try {
-            std::string path = std::string("/sys/bus/usb/devices/") + device;
-            int interface_class = -1;
-
-            std::ifstream file(path + "/bInterfaceClass");
-            file >> interface_class;
-            file.close();
-
-            if (interface_class != 3)
-                continue;
-
-            DriverHelper::DeviceInfo device_info{device};
-            device_info.interfaceClass = interface_class;
-
-            DIR *input_dir = opendir((path + "/input").c_str());
-            if (input_dir) {
-                if (!ParseInputDir((path + "/input"), device_info))
-                    continue;
-            } else { // Try to look for a specific folder that might contain /input before giving up
-                bool was_succ = false;
-                DIR *dev_dir = opendir(path.c_str());
-                while ((ent = readdir(dev_dir)) != nullptr) {
-                    if (ent->d_type == DT_DIR) {
-                        // look for something like 0000:(a bunch of numbers).(a bunch of numbers)
-                        if (isdigit(ent->d_name[0]) && isdigit(ent->d_name[1]) && isdigit(ent->d_name[2]) &&
-                            strstr(ent->d_name, ":") && strstr(ent->d_name, ".")) {
-                            auto inp_path = path + "/" + std::string(ent->d_name) + "/input";
-                            was_succ = ParseInputDir(inp_path, device_info);
-                            break;
-                        }
-                    }
-                }
-                if (!was_succ)
-                    continue;
-            }
-            closedir(input_dir);
-
-            DIR *driver_dir = opendir((path + "/driver").c_str());
-            if (!driver_dir)
-                continue;
-
-            // symlink here is something like ../../../../../../../../bus/usb/, so yea...
-            std::string driver_name_link = std::filesystem::read_symlink(path + "/driver");
-            if (driver_name_link.find("/bus/usb") == std::string::npos)
-                device_info.driver_name = "No driver";
-            else
-                device_info.driver_name = driver_name_link.substr(driver_name_link.find_last_of('/') + 1);
-
-            file = std::ifstream(path + "/bInterfaceSubClass");
-            if (file.good())
-                file >> device_info.interfaceSubClass;
-            file.close();
-
-            file = std::ifstream(path + "/bInterfaceProtocol");
-            if (file.good())
-                file >> device_info.interfaceProtocol;
-            file.close();
-
-            // Look through physical nodes
-            DIR *firm_node_dir = opendir((path + "/firmware_node").c_str());
-            while ((ent = readdir(firm_node_dir)) != nullptr) {
-                if (strstr(ent->d_name, "physical_node")) {
-                    auto test = path + "/firmware_node/" + ent->d_name;
-                    TryParsePhysicalNode(path + "/firmware_node/" + ent->d_name, device_info);
-                }
-            }
-
-            device_info.is_bound_to_leetmouse = device_info.driver_name == "leetmouse";
-
-            devices.push_back(device_info);
-
-            //printf("found a device: %s, name: %s, driver: %s, vendor = %s, protocol = %i\n", device_info.device_id.c_str(), device_info.name.c_str(), device_info.driver_name.c_str(), device_info.manufacturer_id.c_str(), device_info.interfaceProtocol);
-
-            closedir(driver_dir);
-        }
-        catch (std::exception& ex) {
-            printf("Error parsing device info: %s\n", ex.what());
-            continue;
-        }
-    }
-
-    return devices;
 }

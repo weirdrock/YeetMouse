@@ -5,7 +5,7 @@ ROOT="$(git rev-parse --show-toplevel)"
 
 # Read current version
 VERSION=$(cat "${ROOT}/Makefile" | grep -oP "(?<=DKMS_VER\?=)[0-9\.]+")
-SRC_NAME=leetmouse-$VERSION
+SRC_NAME=yeetmouse-$VERSION
 
 # ########## Create output director
 mkdir -p "${ROOT}/pkg/build"

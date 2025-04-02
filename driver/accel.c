@@ -47,11 +47,11 @@ MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Curr
 // ########## Kernel module parameters
 
 // Simple module parameters (instant update)
-PARAM(no_bind,          0,                  "This will disable binding to this driver via 'leetmouse_bind' by udev.");
+//PARAM(no_bind,          0,                  "This will disable binding to this driver via 'yeetmouse_bind' by udev.");
 PARAM(update,           1,                  "Triggers an update of the acceleration parameters below");
 PARAM(AccelerationMode, ACCELERATION_MODE,  "Sets the algorithm to be used for acceleration");
 
-// Acceleration parameters (type pchar. Converted to float via "update_params" triggered by /sys/module/leetmouse/parameters/update)
+// Acceleration parameters (type pchar. Converted to float via "update_params" triggered by /sys/module/yeetmouse/parameters/update)
 PARAM_F(InputCap,       INPUT_CAP,          "Limit the maximum pointer speed before applying acceleration.");
 PARAM_F(Sensitivity,    SENSITIVITY,        "Mouse base sensitivity, or X axis sensitivity if the anisotropy is on."); // Sensitivity for X axis only if sens != sens_y (anisotropy is on), otherwise sensitivity for both axes
 PARAM_F(SensitivityY,   SENSITIVITY_Y,      "Mouse base sensitivity on the Y axis."); // Used only when anisotropy is on
@@ -195,7 +195,7 @@ INLINE void update_params(ktime_t now)
         // Debug stuff (you know it didn't work the first time (nor the 10th time... (that's at least 10 'blue screens')))
         //char buf[25];
         //FP64_ToString(val, buf, 4);
-        //printk("LeetMouse: Converted %s, next char is: %i\n", buf, *p);
+        //printk("YeetMouse: Converted %s, next char is: %i\n", buf, *p);
     }
 
     // Did not work correctly
@@ -475,17 +475,10 @@ int accelerate(int *x, int *y, int *wheel)
     //    highest_elapsed_time = iter_time;
     //if(++iter == 1000) {
     //    iter = 0;
-    //    pr_info("Leetmouse: Sum of 1000 iters: %lldns, low 0.1%%: %lldns\n", ktime_to_ns(elapsed_time), highest_elapsed_time);
+    //    pr_info("YeetMouse: Sum of 1000 iters: %lldns, low 0.1%%: %lldns\n", ktime_to_ns(elapsed_time), highest_elapsed_time);
     //    elapsed_time = 0;
     //    highest_elapsed_time = 0;
     //}
 
     return status;
 }
-
-/*
- * Some other changes worth noting are:
- * Added "ATTRS{bInterfaceNumber}=="00"" in 99-leetmouse.rules (To stop binding keyboards)
- * Early return in usbmouse.c (usb_mouse_probe()) when keyboard detected
- * "leetmouse_manage" fixed to use bash
- */

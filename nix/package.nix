@@ -4,6 +4,8 @@ pkgs @ {
   bash,
   stdenv,
   coreutils,
+  writeShellScript,
+  makeDesktopItem,
   kernel ? pkgs.linuxPackages.kernel,
   ...
 }:
@@ -21,13 +23,18 @@ let
     };
 
     setSourceRoot = "export sourceRoot=$(pwd)/source";
-    nativeBuildInputs = kernel.moduleBuildDependencies ++ [ pkgs.makeWrapper pkgs.autoPatchelfHook ];
+    nativeBuildInputs = with pkgs; kernel.moduleBuildDependencies ++ [
+      makeWrapper
+      autoPatchelfHook
+      copyDesktopItems
+    ];
     buildInputs = [
       stdenv.cc.cc.lib
       pkgs.glfw3
     ];
 
     makeFlags = kernel.makeFlags ++ [
+      "KBUILD_OUTPUT=${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
       "-C"
       "${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
       "M=$(sourceRoot)/driver"
@@ -45,24 +52,33 @@ let
 
     postInstall = ''
       install -Dm755 $sourceRoot/gui/YeetMouseGui $out/bin/yeetmouse
-      # Renaming this to 98- so it takes precedence over `udev.extraRules`
-      install -D $src/install_files/udev/99-leetmouse.rules $out/lib/udev/rules.d/98-leetmouse.rules
-      install -Dm755 $src/install_files/udev/leetmouse_bind $out/lib/udev/rules.d/leetmouse_bind
-      patchShebangs $out/lib/udev/rules.d/leetmouse_bind
-      # This is set so the udev script can find the right binaries, however, it overrides the Nix-injected PATH
-      substituteInPlace $out/lib/udev/rules.d/98-leetmouse.rules \
-        --replace "PATH='/sbin:/bin:/usr/sbin:/usr/bin'" ""
-      # Here we instead inject a PATH from Nix for what the script needs
-      wrapProgram $out/lib/udev/rules.d/leetmouse_bind \
-        --prefix PATH : ${lib.makeBinPath [ bash coreutils ]}
-      # Nix complains if we don't use an absolute path here
-      substituteInPlace $out/lib/udev/rules.d/98-leetmouse.rules \
-        --replace "leetmouse_bind" "$out/lib/udev/rules.d/leetmouse_bind"
     '';
 
     buildFlags = [ "modules" ];
     installFlags = [ "INSTALL_MOD_PATH=${placeholder "out"}" ];
     installTargets = [ "modules_install" ];
+
+    desktopItems = [
+      (makeDesktopItem {
+        name = pname;
+        exec = writeShellScript "yeetmouse.sh" /*bash*/ ''
+          if [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+            xhost +SI:localuser:root
+            pkexec env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" "${pname}"
+            xhost -SI:localuser:root
+          else
+            pkexec env DISPLAY="$DISPLAY" XAUTHORITY="$XAUTHORITY" "${pname}"
+          fi
+        '';
+        type = "Application";
+        desktopName = "Yeetmouse GUI";
+        comment = "Yeetmouse Configuration Tool";
+        categories = [
+          "Settings"
+          "HardwareSettings"
+        ];
+      })
+    ];
 
     meta.mainProgram = "yeetmouse";
   }).overrideAttrs (prev: overrides);
