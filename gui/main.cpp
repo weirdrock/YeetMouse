@@ -581,7 +581,8 @@ int OnGui() {
                             points.erase(points.begin()+i);
                             if (!points.empty()) {
                                 if (i > 0 && i < points.size()) {
-                                    std::swap(control_points[i-1][1], control_points[i][1]);
+                                    // Swap control points before erasing, because of how control points are stored
+                                    std::swap(control_points[i-1][0], control_points[i][0]);
                                 }
                                 if (i > 0)
                                     control_points.erase(control_points.begin()+i-1);
