@@ -165,7 +165,22 @@ static bool driver_match(struct input_handler *handler, struct input_dev *dev) {
     return false;
   struct hid_device *hdev = to_hid_device(dev->dev.parent);
   printk("Yeetmouse: found a possible mouse %s", hdev->name);
-  return hdev->type == HID_TYPE_USBMOUSE;
+  //return hdev->type == HID_TYPE_USBMOUSE; // This only detects USB mice, not bluetooth, or other mice (like PS/2)
+
+  // Discard if doesn't have left button key capabilities
+  if (!test_bit(EV_KEY, dev->evbit) || !test_bit(BTN_LEFT, dev->keybit) || !test_bit(BTN_MOUSE, dev->keybit))
+    return false;
+
+  // Discard if doesn't have relative movement capabilities
+  if (!test_bit(EV_REL, dev->evbit) || !test_bit(REL_X, dev->relbit) || !test_bit(REL_Y, dev->relbit))
+    return false;
+
+  // Discard if doesn't have scroll capabilities (should not be necessary)
+  // if (!test_bit(REL_WHEEL, dev->relbit))
+  //   return false;
+
+  // This still might permit some tablets
+  return true;
 }
 
 /* Same as Linux's input_register_handle but we always add the handle to the head of handlers */
@@ -225,7 +240,7 @@ static int driver_connect(struct input_handler *handler, struct input_dev *dev, 
   if (error)
     goto err_unregister_handle;
 
-  printk(pr_fmt("yeetmouse: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
+  printk(pr_fmt("Yeetmouse: connecting to device: %s (%s at %s)"), dev_name(&dev->dev), dev->name ?: "unknown", dev->phys ?: "unknown");
 
   return 0;
 
