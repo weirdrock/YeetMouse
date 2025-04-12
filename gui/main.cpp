@@ -177,8 +177,8 @@ int OnGui() {
             change |= ImGui::SliderFloat("##SensY_Param", &params[selected_mode].sensY, 0.005, 5, "Sensitivity Y %.3f");
         } else
             change |= ImGui::SliderFloat("##Sens_Param", &params[selected_mode].sens, 0.005, 5, "Sensitivity %.3f");
-        change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 100, "Output Cap. %0.2f");
-        change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 200, "Input Cap. %0.2f");
+        change |= ImGui::SliderFloat("##OutCap_Param", &params[selected_mode].outCap, 0, 5, "Output Cap. %0.2f");
+        change |= ImGui::SliderFloat("##InCap_Param", &params[selected_mode].inCap, 0, 120, "Input Cap. %0.2f");
         change |= ImGui::SliderFloat("##Offset_Param", &params[selected_mode].offset, -50, 50, "Offset %0.2f");
         change |= ImGui::SliderFloat("##PreScale_Param", &params[selected_mode].preScale, 0.01, 10, "Pre-Scale %0.2f");
         ImGui::SetItemTooltip("Used to adjust for different DPI values (Set to 800/DPI)");

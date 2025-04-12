@@ -101,7 +101,7 @@
 - This is (unfortunately) how things are done on most distros, for security reasons I presume.
   But there is a way so save the settings. All You need to do is find the values You like and Export them to a config.h format like so:
   #+CAPTION: Exporting config to a .h format
-  [[https://private-user-images.githubusercontent.com/69699046/397979220-ad0fc1a9-5616-4b41-b453-7398dbb9993c.png?jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3Mzk4MDA4ODksIm5iZiI6MTczOTgwMDU4OSwicGF0aCI6Ii82OTY5OTA0Ni8zOTc5NzkyMjAtYWQwZmMxYTktNTYxNi00YjQxLWI0NTMtNzM5OGRiYjk5OTNjLnBuZz9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNTAyMTclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjUwMjE3VDEzNTYyOVomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTg2YTg0YjI1OTAxMDAwMDUxOWQ0YzNhMzExZmM5NWQ5MzQ3NWE4YjQ4YzcxMTNlYWUyNTE1ZTYzMjMyMGU1M2MmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.bhGe7Igfl56zRPajmUchH2ppTpsGfuD1DyXWjYttQzo]]
+  [[media/YeetMouseExportSaveConfig.png]]
 
   Then simply replace the =config.h= file located in =/driver= (or create a one), and reinstall the driver.
 
