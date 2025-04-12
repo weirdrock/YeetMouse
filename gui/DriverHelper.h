@@ -2,20 +2,12 @@
 #define YEETMOUSE_DRIVERHELPER_H
 
 #include <cmath>
-#include <utility>
-#include <vector>
 #include <string>
-
-#include <iostream>
-#include <string>
-#include <vector>
-#include <cstring>
-#include <fstream>
-#include <sstream>
-#include <sys/types.h>
-#include <unistd.h>
 #include <filesystem>
 #include <algorithm>
+
+#include "External/ImGui/imgui.h"
+#include "CustomCurve.h"
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
@@ -55,6 +47,7 @@ enum AccelMode {
     AccelMode_Motivity = 4,
     AccelMode_Jump = 5,
     AccelMode_Lut = 6,
+    AccelMode_CustomCurve = 7,
     AccelMode_Count,
 };
 
@@ -145,6 +138,8 @@ struct Parameters {
     double LUT_data_x[MAX_LUT_ARRAY_SIZE];
     double LUT_data_y[MAX_LUT_ARRAY_SIZE];
     int LUT_size = 0;
+
+    CustomCurve customCurve{};
 
     Parameters() = default;
 

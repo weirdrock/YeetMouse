@@ -19,4 +19,5 @@ fi
 #sudo dkms remove -m yeetmouse-driver -v $installed_version # Newer dkms versions
 sudo dkms remove "yeetmouse-driver/$installed_version" --all # Older (for Ubuntu <= 20.04), but should work now too
 sudo make remove_dkms
+sudo modprobe -r yeetmouse
 sudo rmmod yeetmouse

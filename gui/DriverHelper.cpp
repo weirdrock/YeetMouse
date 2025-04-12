@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <set>
 
+#include "External/ImGui/imgui_internal.h"
+#include "External/ImGui/implot.h"
+
 #define YEETMOUSE_PARAMS_DIR "/sys/module/yeetmouse/parameters/"
 
 template<typename Ty>
@@ -313,7 +316,6 @@ namespace DriverHelper {
 //                                                                           accel(accel), exponent(exponent),
 //                                                                           midpoint(midpoint), scrollAccel(scrollAccel),
 //                                                                           accelMode(accelMode) {}
-
 
 bool Parameters::SaveAll() {
     bool res = true;
