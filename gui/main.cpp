@@ -96,8 +96,19 @@ int OnGui() {
 
             if (changed) {
                 for (int i = 1; i < NUM_MODES; i++) {
-                    params[i] = imported_params;
-                    params[i].accelMode = static_cast<AccelMode>(i == 0 ? used_mode : i);
+                    if (i == AccelMode_CustomCurve) { // Preserve the custom curve points when copying
+                        CustomCurve curve = params[AccelMode_CustomCurve].customCurve;
+                        params[i] = imported_params;
+                        params[i].customCurve = curve;
+                        params[i].accelMode = AccelMode_Lut;
+
+                        params[i].LUT_size = params[i].customCurve.ExportCurveToLUT(params[i].LUT_data_x, params[i].LUT_data_y);
+                        params[i].customCurve.UpdateLUT();
+                    }
+                    else {
+                        params[i] = imported_params;
+                        params[i].accelMode = static_cast<AccelMode>(i == 0 ? used_mode : i);
+                    }
 
                     functions[i] = CachedFunction(((float) PLOT_X_RANGE) / PLOT_POINTS, &params[i]);
                     functions[i].PreCacheFunc();
@@ -293,15 +304,15 @@ int OnGui() {
                         ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
 // Sliders don't work too well here, so I decided to stick with drag sliders
 //#ifdef USE_INPUT_DRAG
-                        drag_changed |= ImGui::DragFloat("##pos1x", &p.x, 0.5, p_min, p_max);
+                        drag_changed |= ImGui::DragFloat("##pos1x", &p.x, 0.5, p_min, p_max, "%.3f x");
                         ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
-                        drag_changed |= ImGui::DragFloat("##pos1y", &p.y, 0.01, 0, 10);
+                        drag_changed |= ImGui::DragFloat("##pos1y", &p.y, 0.01, 0, 10, "%.3f y");
 // #else
 //                         drag_changed |= ImGui::SliderFloat("##pos1x", &p.x, p_min, p_max);
 //                         ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
 //                         drag_changed |= ImGui::SliderFloat("##pos1y", &p.y, 0, 10);
 // #endif
-                        ImGui::PopItemWidth();
+                        ImGui::PopItemWidth(); ImGui::PopItemWidth();
                         ImGui::EndGroup();
 
                         change |= drag_changed;
@@ -323,20 +334,22 @@ int OnGui() {
                             }
 
                         }
-                        if (points.size() > 1)
+                        if (points.size() > 1) {
+                            ImGui::Separator();
                             for (int j = (i == points.size() - 1 || i == 0) ? 0 : 1; j >= 0; j--) {
                                 ImGui::PushID(j);
                                 ImGui::BeginGroup();
                                 ImGui::PushMultiItemsWidths(2, ImGui::GetContentRegionAvail().x);
                                 auto& p1 = control_points[i == points.size() - 1 ? (i-1) : (i-j)][i == 0 ? 0 : i == points.size() - 1 ? 1 : j];
                                 // p.x = std::clamp(p.x, i > 0 ? points[i-1].x + 0.5f : 0, i < points.size() - 1 ? points[i+1].x - 0.5f : 1000);
-                                change |= ImGui::DragFloat("##pos2x", &p1.x, 0.5, p_min, p_max);
+                                change |= ImGui::DragFloat("##pos2x", &p1.x, 0.5, p_min, p_max, "%.3f x");
                                 ImGui::SameLine(0, g.Style.ItemInnerSpacing.x);
-                                change |= ImGui::DragFloat("##pos2y", &p1.y, 0.01, 0, 10);
-                                ImGui::PopItemWidth();
+                                change |= ImGui::DragFloat("##pos2y", &p1.y, 0.01, 0, 10, "%.3f y");
+                                ImGui::PopItemWidth(); ImGui::PopItemWidth();
                                 ImGui::EndGroup();
                                 ImGui::PopID();
                             }
+                        }
                         ImGui::TreePop();
                     }
                     ImGui::PopID();
@@ -831,7 +844,7 @@ void ResetParameters(void) {
         params[mode] = start_params;
         params[mode].accelMode = static_cast<AccelMode>(mode == 0 ? used_mode : mode);
         if (mode == AccelMode_CustomCurve) {
-            params[mode].accelMode = AccelMode_Lut; // Custom curve is save just like LUT, the only distinction is on the GUI side
+            params[mode].accelMode = AccelMode_Lut; // Custom curve is saved just like LUT, the only distinction is on the GUI side
         }
 
         if (mode == 6) {
