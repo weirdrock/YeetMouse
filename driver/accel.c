@@ -217,16 +217,14 @@ INLINE void update_params(ktime_t now)
 // Acceleration happens here
 int accelerate(int *x, int *y, int *wheel)
 {
-    FP_LONG delta_x, delta_y, delta_whl, ms, speed;
+    FP_LONG delta_x, delta_y, ms, speed;
     //static long buffer_x = 0;
     //static long buffer_y = 0;
-    static long buffer_whl = 0;
     //Static float assignment should happen at compile-time and thus should be safe here. However, avoid non-static assignment of floats outside kernel_fpu_begin()/kernel_fpu_end()
     static FP_LONG carry_x = 0;
     static FP_LONG carry_y = 0;
     //static FP_LONG carry_whl = 0;
     static FP_LONG last_ms = One;
-    static long long iter = 0;
     static ktime_t last;//, elapsed_time, highest_elapsed_time;
     ktime_t now;
     int status = 0;
@@ -446,8 +444,6 @@ int accelerate(int *x, int *y, int *wheel)
 
     delta_x = FP64_Add(delta_x, carry_x);
     delta_y = FP64_Add(delta_y, carry_y);
-    //delta_x += carry_x;
-    //delta_y += carry_y;
 
     // I don't do wheel, sorry
     //delta_whl *= g_ScrollsPerTick/3.0f;
@@ -462,9 +458,6 @@ int accelerate(int *x, int *y, int *wheel)
     //Cast back to int
     *x = FP64_RoundToInt(delta_x);
     *y = FP64_RoundToInt(delta_y);
-    //*x = Leet_round(&delta_x);
-    //*y = Leet_round(&delta_y);
-    //*wheel = Leet_round(&delta_whl);
 
     //Save carry for next round
     carry_x = FP64_Sub(delta_x, FP64_FromInt(*x));
