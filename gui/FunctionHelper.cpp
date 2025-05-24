@@ -27,7 +27,16 @@ float CachedFunction::EvalFuncAt(float x) {
         }
         case AccelMode_Power: // Power
         {
-            val = pow(x * params->accel, params->exponent);
+            if (x <= offset_x)
+                val = params->midpoint;
+            else
+                val = pow(x * params->accel, params->exponent) + (power_constant / x);
+
+            offset_x = pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel;
+            power_constant = offset_x * params->midpoint * params->exponent / (params->exponent + 1);
+
+            pow(x * params->accel, params->exponent) + (((pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel) * params->midpoint * params->exponent / (params->exponent + 1)) / x);
+
             break;
         }
         case AccelMode_Classic: // Classic
@@ -132,6 +141,9 @@ void CachedFunction::PreCacheFunc() {
         }
         case AccelMode_Power:
         {
+            offset_x = pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel;
+            power_constant = offset_x * params->midpoint * params->exponent / (params->exponent + 1);
+            //printf("offset_x = %f, constant = %f\n", offset_x, power_constant);
             break;
         }
         case AccelMode_Classic:
@@ -179,4 +191,57 @@ void CachedFunction::PreCacheFunc() {
             values_y[i] = val / params->sens * params->sensY;
         x += x_stride;
     }
+
+    ValidateSettings();
+}
+
+
+bool CachedFunction::ValidateSettings() {
+    isValid = true;
+
+    for (int i = 0; i < PLOT_POINTS; i++) {
+        if (isnan(values[i]) || isnan(values_y[i]) || isinf(values[i]) || isinf(values_y[i]) || values[i] > 1e5 || values_y[i] > 1e5) {
+            isValid = false;
+            return isValid;
+        }
+    }
+
+    if (params->exponent <= 0)
+        isValid = false;
+
+    if (params->accel <= 0)
+        isValid = false;
+
+    if (params->midpoint < 0)
+        isValid = false;
+
+    if (params->accelMode == AccelMode_Lut) {
+        for (int i = 0; i < MAX_LUT_ARRAY_SIZE; i++) {
+            if (isnan(params->LUT_data_x[i]) || isnan(params->LUT_data_y[i])) {
+                isValid = false;
+                return isValid;
+            }
+        }
+    }
+
+    if (params->accelMode == AccelMode_Power) {
+        if (pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel > 1e8) {
+            isValid = false;
+            }
+
+        if (isnan(power_constant) || isinf(power_constant) || isnan(offset_x) || isinf(offset_x)) {
+            isValid = false;
+        }
+    }
+
+    if (params->accelMode == AccelMode_Jump) {
+        if (params->midpoint <= 0)
+            isValid = false;
+
+        if (isnan(smoothness) || isinf(smoothness) || isnan(C0) || isinf(C0)) {
+            isValid = false;
+        }
+    }
+
+    return isValid;
 }

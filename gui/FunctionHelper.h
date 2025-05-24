@@ -16,16 +16,25 @@ public:
     float x_stride = 0;
     Parameters* params;
 
+    bool isValid = true;
+
     CachedFunction(float xStride, Parameters *params);
     CachedFunction() {};
 
     float EvalFuncAt(float x);
-    void PreCacheFunc();
+    void PreCacheFunc(); // Also validates settings
+
+    // Result also saved into 'bool isValid'
+    bool ValidateSettings();
 
 private:
     // Constant parameters for Jump
     float smoothness = 0;
     float C0 = 0;
+
+    // Power
+    float offset_x = 0;
+    float power_constant = 0;
 };
 
 #endif //GUI_FUNCTIONHELPER_H

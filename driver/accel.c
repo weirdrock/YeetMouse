@@ -60,7 +60,7 @@ PARAM_F(OutputCap,      OUTPUT_CAP,         "Cap maximum sensitivity.");
 PARAM_F(Offset,         OFFSET,             "Mouse acceleration shift.");
 
 PARAM_F(Exponent,       EXPONENT,           "Exponent for algorithms that use it");
-PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function");
+PARAM_F(Midpoint,       MIDPOINT,           "Midpoint for sigmoid function, Output Offset for Power mode");
 PARAM_F(PreScale,       PRESCALE,           "Parameter to adjust for the DPI");
 PARAM  (UseSmoothing,   USE_SMOOTHING,      "Whether to smooth out functions (doesn't apply to all)");
 //PARAM_F(ScrollsPerTick, SCROLLS_PER_TICK,   "Amount of lines to scroll per scroll-wheel tick.");
@@ -120,6 +120,10 @@ struct ModesConstants {
     FP_LONG accel_sub_1;
     FP_LONG exp_sub_1;
 
+    // Power
+    FP_LONG offset_x;
+    FP_LONG power_constant;
+
     // Rotation
     FP_LONG sin_a, cos_a;
 
@@ -135,14 +139,53 @@ static void update_constants(void) {
     modesConst.exp_sub_1 = FP64_Sub(g_Exponent, FP64_ONE);
 
     // Jump
-    modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
-    FP_LONG r_times_m = FP64_Mul(modesConst.r, g_Midpoint);
+    if (g_AccelerationMode == 5) {
+        if (g_Exponent == 0 || g_Midpoint == 0) {
+            printk("YeetMouse: Warning: Acceleration mode 'Jump' is not supported for exponent 0 midpoint 0. Falling back to mode 1.\n");
+            g_Exponent = 1;
+            g_Midpoint = 1;
+            g_Acceleration = 0;
+            g_AccelerationMode = 1;
+        }
+        else {
+            modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
+            FP_LONG r_times_m = FP64_Mul(modesConst.r, g_Midpoint);
 
-    // Safely exponentiate without overflow (ln(1+exp(x)) when x -> 'inf' = ln(exp(x)) = x. (in practice works for x >= 8))
-    if (r_times_m < (EXP_ARG_THRESHOLD << FP64_Shift))
-        modesConst.C0 = FP64_Mul(FP64_DivPrecise(FP64_Log(FP64_Add(1, FP64_Exp(r_times_m))), modesConst.r), modesConst.accel_sub_1);
-    else
-        modesConst.C0 = FP64_Mul(modesConst.accel_sub_1, g_Midpoint);
+            // Safely exponentiate without overflow (ln(1+exp(x)) when x -> 'inf' = ln(exp(x)) = x. (in practice works for x >= 8))
+            if (r_times_m < (EXP_ARG_THRESHOLD << FP64_Shift))
+                modesConst.C0 = FP64_Mul(FP64_DivPrecise(FP64_Log(FP64_Add(1, FP64_Exp(r_times_m))), modesConst.r), modesConst.accel_sub_1);
+            else
+                modesConst.C0 = FP64_Mul(modesConst.accel_sub_1, g_Midpoint);
+        }
+    }
+
+    // Power
+    if (g_AccelerationMode == 2) {
+        if (g_Exponent == 0 || g_Exponent == -FP64_ONE || g_Acceleration == 0) {
+            printk("YeetMouse: Warning: Acceleration mode 'Power' is not supported for exponent 0 or -1 or acceleration 0. Falling back to mode 1.\n");
+            g_Acceleration = 0;
+            g_AccelerationMode = 1;
+        }
+        else if (g_Midpoint == 0) {
+            modesConst.offset_x = 0;
+            modesConst.power_constant = 0;
+        }
+        else {
+            // modesConst.offset_x = FP64_DivPrecise(FP64_Pow(FP64_DivPrecise(g_Midpoint, FP64_Add(g_Exponent, FP64_ONE)),
+            //     FP64_DivPrecise(FP64_ONE, g_Exponent)), g_Acceleration);
+            // modesConst.power_constant = FP64_DivPrecise(FP64_Mul(modesConst.offset_x, FP64_Mul(g_Midpoint, g_Exponent)), FP64_Add(g_Exponent, FP64_ONE));
+
+            FP_LONG exponent_plus_one = FP64_Add(g_Exponent, FP64_ONE);
+            FP_LONG one_over_exponent = FP64_DivPrecise(FP64_ONE, g_Exponent);
+            FP_LONG base_value = FP64_DivPrecise(g_Midpoint, exponent_plus_one);
+
+            FP_LONG pow_result = FP64_Pow(base_value, one_over_exponent);
+            modesConst.offset_x = FP64_DivPrecise(pow_result, g_Acceleration);
+
+            FP_LONG intermediate = FP64_Mul(modesConst.offset_x, FP64_Mul(g_Midpoint, g_Exponent));
+            modesConst.power_constant = FP64_DivPrecise(intermediate, exponent_plus_one);
+        }
+    }
 
     // Rotation (precalculate the trig. functions)
     modesConst.sin_a = FP64_Sin(g_RotationAngle);
@@ -281,7 +324,7 @@ int accelerate(int *x, int *y, int *wheel)
         }
     }
 
-    //Calculate rate from travelled overall distance and add possible rate offsets
+    //Calculate rate from traveled overall distance and add possible rate offsets
     speed = FP64_DivPrecise(speed, ms);
     speed = FP64_Sub(speed, g_Offset);
 
@@ -301,10 +344,14 @@ int accelerate(int *x, int *y, int *wheel)
 
         // Power acceleration
         else if(g_AccelerationMode == 2) {
-            // (Speed * Acceleration)^Exponent
+            // (Speed * Acceleration)^Exponent + constant / x
 
-            speed = FP64_Mul(speed, g_Acceleration);
-            speed = FP64_PowFast(speed, g_Exponent);
+            if (speed <= modesConst.offset_x)
+                speed = g_Midpoint;
+            else if (modesConst.power_constant == 0)
+                speed = FP64_PowFast(FP64_Mul(speed, g_Acceleration), g_Exponent);
+            else
+                speed = FP64_Add(FP64_PowFast(FP64_Mul(speed, g_Acceleration), g_Exponent), FP64_DivPrecise(modesConst.power_constant, speed));
         }
 
         // Classic acceleration

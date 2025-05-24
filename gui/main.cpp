@@ -53,6 +53,7 @@ int OnGui() {
 
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("File")) {
+            ImGui::BeginDisabled(!functions[selected_mode].isValid);
             if (ImGui::BeginMenu("Export")) {
                 if (ImGui::MenuItem("Plain text")) {
                     //printf("Plain text:\n%s\n", ConfigHelper::ExportPlainText(params[selected_mode], true).c_str());
@@ -77,6 +78,10 @@ int OnGui() {
                 }
                 ImGui::EndMenu();
             }
+            ImGui::EndDisabled();
+
+            if (!functions[selected_mode].isValid)
+                ImGui::SetItemTooltip("Can't export invalid parameters");
 
             Parameters imported_params;
             bool changed = false;
@@ -210,8 +215,9 @@ int OnGui() {
                         change |= ImGui::DragFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 0.01, 1, "Exponent %0.2f");
 #else
                 change |= ImGui::SliderFloat("##Accel_Param", &params[selected_mode].accel, 0.001, 5,
-                                             "Acceleration %0.2f");
+                                             "Acceleration %0.3f");
                 change |= ImGui::SliderFloat("##Exp_Param", &params[selected_mode].exponent, 0.01, 1, "Exponent %0.2f");
+                change |= ImGui::SliderFloat("##OutOffset_Param", &params[selected_mode].midpoint, 0, 5, "Output Offset %0.2f");
 #endif
                 break;
             }
@@ -804,7 +810,8 @@ int OnGui() {
         // Disable Apply button for 1.1 second after clicking it (this is a driver "limitation")
         ImGui::BeginDisabled(!has_privilege || !was_initialized ||
                              duration_cast<milliseconds>(steady_clock::now() - last_apply_clicked).count() < 1100 ||
-                             (selected_mode == 6 /* LUT */ && params[selected_mode].LUT_size == 0));
+                             (selected_mode == 6 /* LUT */ && params[selected_mode].LUT_size == 0) ||
+                             !functions[selected_mode].isValid);
 
         if (ImGui::Button("Apply", {-1, -1})) {
             params[selected_mode].SaveAll();
@@ -815,6 +822,10 @@ int OnGui() {
         }
 
         ImGui::EndDisabled();
+
+        if (!functions[selected_mode].isValid) {
+            ImGui::SetItemTooltip("Invalid parameters");
+        }
 
         ImGui::SetWindowFontScale(1.f);
     } else
