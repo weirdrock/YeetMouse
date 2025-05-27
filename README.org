@@ -103,7 +103,7 @@
   #+CAPTION: Exporting config to a .h format
   [[media/YeetMouseExportSaveConfig.png]]
 
-  Then simply replace the =config.h= file located in =/driver= (or create a one), and reinstall the driver.
+  Then simply replace the =config.h= file located in =/driver= (or create a one), and reinstall the driver (uninstall and install).
 
 *** Mouse feels off (too fast / slow)
 - On some distros (for example Ubuntu 20.04) system adds an additional sensitivity on top of the driver. To combat this You'll need to configure the settings correctly.

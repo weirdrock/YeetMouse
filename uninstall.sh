@@ -4,7 +4,7 @@
 installed_version=$(dkms status -k $(uname -r) | grep -oP '^([l|y]eetmouse-driver[\/(, )]) ?\K([0-9.]+)')
 
 # Check if the driver is even installed
-if [[ -z "$installed_version" ]] then
+if [[ -z "$installed_version" ]]; then
 	echo "Driver not installed, exiting."
 	exit 0
 fi
