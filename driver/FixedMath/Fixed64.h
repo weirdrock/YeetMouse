@@ -275,34 +275,6 @@ static FP_LONG FP64_Lerp(FP_LONG a, FP_LONG b, FP_LONG t) {
 
 static FP_INT FP64_Nlz(FP_ULONG x) {
     return __builtin_clzll(x); // Use the gcc built-in, it's much faster
-#if NET5_0_OR_GREATER
-    return System.Numerics.BitOperations.LeadingZeroCount(x);
-#else
-    FP_INT n = 0;
-    if (x <= 0x00000000FFFFFFFFll) {
-        n = n + 32;
-        x = x << 32;
-    }
-    if (x <= 0x0000FFFFFFFFFFFFll) {
-        n = n + 16;
-        x = x << 16;
-    }
-    if (x <= 0x00FFFFFFFFFFFFFFll) {
-        n = n + 8;
-        x = x << 8;
-    }
-    if (x <= 0x0FFFFFFFFFFFFFFFll) {
-        n = n + 4;
-        x = x << 4;
-    }
-    if (x <= 0x3FFFFFFFFFFFFFFFll) {
-        n = n + 2;
-        x = x << 2;
-    }
-    if (x <= 0x7FFFFFFFFFFFFFFFll) { n = n + 1; }
-    if (x == 0) return 64;
-    return n;
-#endif
 }
 
 // Divides a 128 bit int (u1:u0) by a 64 bit int (v)
@@ -1388,13 +1360,13 @@ static void FP64_ToString(FP_LONG value, char *buf, int decimals) {
 
 #include <linux/types.h>
 
-#define isdigit(c) (c >= '0' && c <= '9')
-#define isspace(c) (c == ' ' || c == '\t' || c == '\n')
+#define _isdigit(c) (c >= '0' && c <= '9')
+#define _isspace(c) (c == ' ' || c == '\t' || c == '\n')
 
 // Returns the number of converted bytes
 static int FP64_FromString(const char *buf, FP_LONG *val) {
     const char* start_pos = buf;
-    while (isspace(*buf))
+    while (_isspace(*buf))
         buf++;
 
     /* Decode the sign */
@@ -1405,7 +1377,7 @@ static int FP64_FromString(const char *buf, FP_LONG *val) {
     /* Decode the integer part */
     uint64_t intpart = 0;
     int count = 0;
-    while (isdigit(*buf)) {
+    while (_isdigit(*buf)) {
         intpart *= 10;
         intpart += *buf++ - '0';
         count++;
@@ -1422,7 +1394,7 @@ static int FP64_FromString(const char *buf, FP_LONG *val) {
 
         uint64_t fracpart = 0;
         uint64_t scale = 1;
-        while (isdigit((unsigned char) *buf) && scale < 1000000000000000000LL) {
+        while (_isdigit((unsigned char) *buf) && scale < 1000000000000000000LL) {
             scale *= 10;
             fracpart *= 10;
             fracpart += *buf++ - '0';
@@ -1433,7 +1405,7 @@ static int FP64_FromString(const char *buf, FP_LONG *val) {
 
     /* Verify that there is no garbage left over */
     while (*buf != '\0' && *buf != ';') {
-        if (!isdigit((unsigned char) *buf) && !isspace((unsigned char) *buf))
+        if (!_isdigit((unsigned char) *buf) && !_isspace((unsigned char) *buf))
             return 0;
 
         buf++;

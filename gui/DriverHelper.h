@@ -6,8 +6,8 @@
 #include <filesystem>
 #include <algorithm>
 
-#include "External/ImGui/imgui.h"
 #include "CustomCurve.h"
+#include "../shared_definitions.h"
 
 #define MAX_LUT_ARRAY_SIZE 128  // THIS NEEDS TO BE THE SAME AS IN THE DRIVER CODE
 
@@ -38,18 +38,6 @@ namespace DriverHelper {
     std::string EncodeLutData(double *data_x, double *data_y, size_t size);
 
 } // DriverHelper
-
-enum AccelMode {
-    AccelMode_Current = 0,
-    AccelMode_Linear = 1,
-    AccelMode_Power = 2,
-    AccelMode_Classic = 3,
-    AccelMode_Motivity = 4,
-    AccelMode_Jump = 5,
-    AccelMode_Lut = 6,
-    AccelMode_CustomCurve = 7,
-    AccelMode_Count,
-};
 
 inline std::string AccelMode2String(AccelMode mode) {
     switch (mode) {

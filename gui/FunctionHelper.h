@@ -22,6 +22,7 @@ public:
     CachedFunction() {};
 
     float EvalFuncAt(float x);
+    void PreCacheConstants();
     void PreCacheFunc(); // Also validates settings
 
     // Result also saved into 'bool isValid'

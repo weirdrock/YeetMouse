@@ -68,6 +68,7 @@ setup_dkms:
 	install -m 644 -v driver/*.c $(DESTDIR)/usr/src/$(DKMS_NAME)-$(DKMS_VER)/driver/
 	install -m 644 -v driver/*.h $(DESTDIR)/usr/src/$(DKMS_NAME)-$(DKMS_VER)/driver/
 	install -m 644 -v driver/FixedMath/*.h $(DESTDIR)/usr/src/$(DKMS_NAME)-$(DKMS_VER)/driver/FixedMath/
+	install -m 644 -v shared_definitions.h $(DESTDIR)/usr/src/$(DKMS_NAME)-$(DKMS_VER)/
 	@rm -fv $(DESTDIR)/usr/src/$(DKMS_NAME)-$(DKMS_VER)/driver/*.mod.c
 
 remove_dkms:

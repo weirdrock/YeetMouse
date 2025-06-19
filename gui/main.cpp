@@ -25,7 +25,7 @@
 
 AccelMode selected_mode = AccelMode_Linear;
 
-const char *AccelModes[] = {"Current", "Linear", "Power", "Classic", "Motivity", "Jump", "Look Up Table", "Custom Curve"};
+const char *AccelModes[AccelMode_Count] = {"Current", "Linear", "Power", "Classic", "Motivity", "Jump", "Look Up Table", "Custom Curve"};
 #define NUM_MODES AccelMode_Count //(sizeof(AccelModes) / sizeof(char *))
 
 Parameters params[NUM_MODES]; // Driver parameters for each mode
@@ -858,23 +858,23 @@ void ResetParameters(void) {
             params[mode].accelMode = AccelMode_Lut; // Custom curve is saved just like LUT, the only distinction is on the GUI side
         }
 
-        if (mode == 6) {
+        if (mode == AccelMode_Lut) {
             memcpy(params[mode].LUT_data_x, start_params.LUT_data_x,
                    start_params.LUT_size * sizeof(params[selected_mode].LUT_data_x[0]));
             memcpy(params[mode].LUT_data_y, start_params.LUT_data_y,
                    start_params.LUT_size * sizeof(params[selected_mode].LUT_data_y[0]));
         }
 
-        if (mode == 1)
+        if (mode == AccelMode_Linear)
             params[mode].accel = fminf(0.1, params[mode].accel);
 
-        if (mode == 3)
+        if (mode == AccelMode_Classic)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 5), 2.1);
 
-        if (mode == 5)
+        if (mode == AccelMode_Jump)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.01);
 
-        if (mode == 2)
+        if (mode == AccelMode_Power)
             params[mode].exponent = fmaxf(fminf(params[mode].exponent, 1), 0.1);
 
         if (mode == AccelMode_CustomCurve) {

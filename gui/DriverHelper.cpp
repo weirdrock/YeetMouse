@@ -263,6 +263,11 @@ namespace DriverHelper {
 
             // Unzip
             for (int i = 0; i < idx / 2; i++) {
+                if (i >= 1) {
+                    if (pairs[i].first == pairs[i - 1].first && pairs[i].second == pairs[i - 1].second) {
+                        continue;
+                    }
+                }
                 out_x[i] = pairs[i].first;
                 out_y[i] = pairs[i].second;
             }
@@ -346,7 +351,7 @@ bool Parameters::SaveAll() {
         //printf("encoded: %s, size: %zu, stride: %i\n", encoded.c_str(), LUT_size, LUT_stride);
         res &= SetParameterTy("LutDataBuf", encodedLutData);
     }
-    else if(accelMode == 6)
+    else if(accelMode == AccelMode_Lut)
         return false;
 
     if(res)

@@ -8,14 +8,13 @@
 #include <linux/time.h>
 #include <linux/string.h>   //strlen
 #include "FixedMath/Fixed64.h"
+#include "../shared_definitions.h"
+#include "accel_modes.h"
 
 MODULE_AUTHOR("Christopher Williams <chilliams (at) gmail (dot) com>"); //Original idea of this module
 MODULE_AUTHOR("Klaus Zipfel <klaus (at) zipfel (dot) family>");         //Current maintainer
 MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Current maintainer
 // Sorry if you have issues with compilation because of this silly character in my family name lol <3
-
-#define MAX_LUT_ARRAY_SIZE 128
-#define MAX_LUT_BUF_LEN 4096
 
 //Converts a preprocessor define's value in "config.h" to a string - Suspect this to change in future version without a "config.h"
 #define _s(x) #x
@@ -24,23 +23,23 @@ MODULE_AUTHOR("Maciej Grzęda <gmaciejg525 (at) gmail (dot) com>");      // Curr
 //Convenient helper for float based parameters, which are passed via a string to this module (must be individually parsed via atof() - available in util.c)
 #define PARAM_F(param, default, desc)                           \
     FP_LONG g_##param = C0NST_FP64_FromDouble(default);                     \
-    static char* g_param_##param = s(default);                  \
+    char* g_param_##param = s(default);                  \
     module_param_named(param, g_param_##param, charp, 0644);    \
     MODULE_PARM_DESC(param, desc);
 
 #define PARAM(param, default, desc)                             \
-    static char g_##param = default;                            \
+    char g_##param = default;                            \
     module_param_named(param, g_##param, byte, 0644);           \
     MODULE_PARM_DESC(param, desc);
 
 #define PARAM_ARR(param, default, desc) \
-    static char g_param_##param[MAX_LUT_BUF_LEN] = s(default);                            \
+    char g_param_##param[MAX_LUT_BUF_LEN] = s(default);                            \
     module_param_string(param, g_param_##param, MAX_LUT_BUF_LEN, 0644);           \
     MODULE_PARM_DESC(param, desc);
 
 #define PARAM_UL(param, default, desc)                           \
     unsigned long g_##param = (unsigned long)default;                     \
-    static char* g_param_##param = s(default);                            \
+    char* g_param_##param = s(default);                            \
     module_param_named(param, g_##param, ulong, 0644);           \
     MODULE_PARM_DESC(param, desc);
 
@@ -99,104 +98,8 @@ unsigned long atoul(const char *str) {
 #define PARAM_UPDATE(param) (FP64_FromString(g_param_##param, &g_##param))
 #define PARAM_UPDATE_UL(param) (atoul(g_param_##param))
 
-const FP_LONG FP64_PI = C0NST_FP64_FromDouble(3.14159);
-const FP_LONG FP64_PI_2 = C0NST_FP64_FromDouble(1.57079);
-const FP_LONG FP64_PI_4 = C0NST_FP64_FromDouble(0.78539);
-const FP_LONG FP64_0_1     = 429496736;
-const FP_LONG FP64_1    = 1ll << FP64_Shift;
-const FP_LONG FP64_10      = 10ll << FP64_Shift;
-const FP_LONG FP64_100     = 100ll << FP64_Shift;
-const FP_LONG FP64_1000    = 1000ll << FP64_Shift;
-const FP_LONG FP64_10000    = 10000ll << FP64_Shift;
-
 // Aggregate values that don't change with speed to save on calculations done every irq
-struct ModesConstants {
-    bool is_init;
-
-    // Jump
-    FP_LONG C0; // the "integral" evaluated at 0
-    FP_LONG r; // basically a smoothness factor
-
-    FP_LONG accel_sub_1;
-    FP_LONG exp_sub_1;
-
-    // Power
-    FP_LONG offset_x;
-    FP_LONG power_constant;
-
-    // Rotation
-    FP_LONG sin_a, cos_a;
-
-    // Angle Snapping
-    FP_LONG as_sin, as_cos;
-    FP_LONG as_half_threshold;
-} modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0, .as_cos = 0, .as_sin = 0, .as_half_threshold = 0 };
-
-// Recalculate new modes constants
-static void update_constants(void) {
-    // General
-    modesConst.accel_sub_1 = FP64_Sub(g_Acceleration, FP64_ONE);
-    modesConst.exp_sub_1 = FP64_Sub(g_Exponent, FP64_ONE);
-
-    // Jump
-    if (g_AccelerationMode == 5) {
-        if (g_Exponent == 0 || g_Midpoint == 0) {
-            printk("YeetMouse: Warning: Acceleration mode 'Jump' is not supported for exponent 0 midpoint 0. Falling back to mode 1.\n");
-            g_Exponent = 1;
-            g_Midpoint = 1;
-            g_Acceleration = 0;
-            g_AccelerationMode = 1;
-        }
-        else {
-            modesConst.r = FP64_DivPrecise(FP64_Mul(Two, Pi), FP64_Mul(g_Exponent, g_Midpoint));
-            FP_LONG r_times_m = FP64_Mul(modesConst.r, g_Midpoint);
-
-            // Safely exponentiate without overflow (ln(1+exp(x)) when x -> 'inf' = ln(exp(x)) = x. (in practice works for x >= 8))
-            if (r_times_m < (EXP_ARG_THRESHOLD << FP64_Shift))
-                modesConst.C0 = FP64_Mul(FP64_DivPrecise(FP64_Log(FP64_Add(1, FP64_Exp(r_times_m))), modesConst.r), modesConst.accel_sub_1);
-            else
-                modesConst.C0 = FP64_Mul(modesConst.accel_sub_1, g_Midpoint);
-        }
-    }
-
-    // Power
-    if (g_AccelerationMode == 2) {
-        if (g_Exponent == 0 || g_Exponent == -FP64_ONE || g_Acceleration == 0) {
-            printk("YeetMouse: Warning: Acceleration mode 'Power' is not supported for exponent 0 or -1 or acceleration 0. Falling back to mode 1.\n");
-            g_Acceleration = 0;
-            g_AccelerationMode = 1;
-        }
-        else if (g_Midpoint == 0) {
-            modesConst.offset_x = 0;
-            modesConst.power_constant = 0;
-        }
-        else {
-            // modesConst.offset_x = FP64_DivPrecise(FP64_Pow(FP64_DivPrecise(g_Midpoint, FP64_Add(g_Exponent, FP64_ONE)),
-            //     FP64_DivPrecise(FP64_ONE, g_Exponent)), g_Acceleration);
-            // modesConst.power_constant = FP64_DivPrecise(FP64_Mul(modesConst.offset_x, FP64_Mul(g_Midpoint, g_Exponent)), FP64_Add(g_Exponent, FP64_ONE));
-
-            FP_LONG exponent_plus_one = FP64_Add(g_Exponent, FP64_ONE);
-            FP_LONG one_over_exponent = FP64_DivPrecise(FP64_ONE, g_Exponent);
-            FP_LONG base_value = FP64_DivPrecise(g_Midpoint, exponent_plus_one);
-
-            FP_LONG pow_result = FP64_Pow(base_value, one_over_exponent);
-            modesConst.offset_x = FP64_DivPrecise(pow_result, g_Acceleration);
-
-            FP_LONG intermediate = FP64_Mul(modesConst.offset_x, FP64_Mul(g_Midpoint, g_Exponent));
-            modesConst.power_constant = FP64_DivPrecise(intermediate, exponent_plus_one);
-        }
-    }
-
-    // Rotation (precalculate the trig. functions)
-    modesConst.sin_a = FP64_Sin(g_RotationAngle);
-    modesConst.cos_a = FP64_Cos(g_RotationAngle);
-
-    modesConst.as_cos = FP64_Cos(g_AngleSnap_Angle);
-    modesConst.as_sin = FP64_Sin(g_AngleSnap_Angle);
-    modesConst.as_half_threshold = FP64_DivPrecise(g_AngleSnap_Threshold, 2ll << FP64_Shift);
-
-    modesConst.is_init = true;
-}
+struct ModesConstants modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0, .as_cos = 0, .as_sin = 0, .as_half_threshold = 0 };
 
 static ktime_t g_next_update = 0;
 INLINE void update_params(ktime_t now)
@@ -246,8 +149,12 @@ INLINE void update_params(ktime_t now)
         g_LutSize = 0;
 
     // Sanity check
-    if((g_LutSize <= 1 /*|| g_LutStride == 0*/) && g_AccelerationMode == 6)
-        g_AccelerationMode = 1;
+    if((g_LutSize <= 1 /*|| g_LutStride == 0*/) && g_AccelerationMode == AccelMode_Lut)
+        g_AccelerationMode = AccelMode_Current;
+
+    if (g_AccelerationMode == AccelMode_Lut &&
+        (g_LutData_x[g_LutSize-1] == g_LutData_x[g_LutSize-2] && g_LutData_y[g_LutSize-1] == g_LutData_y[g_LutSize-2]))
+        g_AccelerationMode = AccelMode_Current;
 
     // Angle snap threshold should be in range [0, PI)
     if(g_AngleSnap_Threshold >= FP64_PI || g_AngleSnap_Threshold < 0) {
@@ -268,7 +175,7 @@ int accelerate(int *x, int *y, int *wheel)
     static FP_LONG carry_y = 0;
     //static FP_LONG carry_whl = 0;
     static FP_LONG last_ms = One;
-    static ktime_t last;//, elapsed_time, highest_elapsed_time;
+    static ktime_t last;
     ktime_t now;
     int status = 0;
 
@@ -329,119 +236,33 @@ int accelerate(int *x, int *y, int *wheel)
     speed = FP64_Sub(speed, g_Offset);
 
     // Apply acceleration if movement is over offset
-    if(speed > 0)
-    {
-        // Linear acceleration
-        if(g_AccelerationMode == 1) {
-            // Speed * Acceleration
-            //speed *= g_Acceleration;
-            //speed += 1;
-
-            // FIXED-POINT:
-            speed = FP64_Mul(speed, g_Acceleration);
-            speed = FP64_Add(FP64_1, speed);
+    if (speed > 0) {
+        switch (g_AccelerationMode) {
+            case AccelMode_Linear:
+                speed = accel_linear(speed);
+                break;
+            case AccelMode_Power:
+                speed = accel_power(speed);
+                break;
+            case AccelMode_Classic:
+                speed = accel_classic(speed);
+                break;
+            case AccelMode_Motivity:
+                speed = accel_motivity(speed);
+                break;
+            case AccelMode_Jump:
+                speed = accel_jump(speed);
+                break;
+            case AccelMode_Lut: case AccelMode_CustomCurve:
+                speed = accel_lut(speed);
+                break;
+            default:
+                speed = FP64_1;
+                break;
         }
-
-        // Power acceleration
-        else if(g_AccelerationMode == 2) {
-            // (Speed * Acceleration)^Exponent + constant / x
-
-            if (speed <= modesConst.offset_x)
-                speed = g_Midpoint;
-            else if (modesConst.power_constant == 0)
-                speed = FP64_PowFast(FP64_Mul(speed, g_Acceleration), g_Exponent);
-            else
-                speed = FP64_Add(FP64_PowFast(FP64_Mul(speed, g_Acceleration), g_Exponent), FP64_DivPrecise(modesConst.power_constant, speed));
-        }
-
-        // Classic acceleration
-        else if(g_AccelerationMode == 3) {
-            // (Speed * Acceleration) ^ (Exponent - 1) + 1
-            // Same as above just without adding the one
-            //speed *= g_Acceleration;
-            //speed += 1;
-            //B_pow(&speed, &g_Exponent);
-
-            // FIXED-POINT:
-            speed = FP64_Mul(speed, g_Acceleration);
-            speed = FP64_PowFast(speed, modesConst.exp_sub_1);
-            speed = FP64_Add(speed, FP64_1);
-        }
-
-        // Motivity (Sigmoid function)
-        else if(g_AccelerationMode == 4) {
-            // Acceleration / ( 1 + e ^ (midpoint - x))
-            //product = g_Midpoint-speed;
-            //motivity = e;
-            //B_pow(&motivity, &product);
-            //motivity = g_Acceleration / (1 + motivity);
-            //speed = motivity;
-
-            // FIXED-POINT:
-            FP_LONG exp = FP64_ExpFast(FP64_Sub(g_Midpoint, speed));
-            speed = FP64_Add(FP64_1, FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(FP64_1, exp)));
-        }
-
-        // Jump / Smooth Jump
-        else if(g_AccelerationMode == 5) {
-            // r = 2pi/(k*midpoint), where k is the smoothness factor (stored inside g_Exponent)
-            // Jump: Acceleration / (1 + exp(r(midpoint - x))) + 1
-            // Smooth: Integral of the above divided by x pretty much
-
-            FP_LONG exp_arg = FP64_Mul(modesConst.r, FP64_Sub(g_Midpoint, speed));
-            FP_LONG D = FP64_ExpFast(exp_arg);
-
-            if(g_UseSmoothing) { // smooth
-                FP_LONG natural_log = exp_arg > (EXP_ARG_THRESHOLD << FP64_Shift) ? exp_arg : FP64_LogFast(FP64_Add(FP64_1, D));
-                FP_LONG integral = FP64_Mul(modesConst.accel_sub_1, FP64_Add(speed, FP64_DivPrecise(natural_log, modesConst.r)));
-                // Not really an integral
-                speed = FP64_Add(FP64_DivPrecise(FP64_Sub(integral, modesConst.C0), speed), FP64_1);
-            }
-            else {
-                speed = FP64_Add(FP64_DivPrecise(modesConst.accel_sub_1, FP64_Add(FP64_1, D)), FP64_1);
-            }
-        }
-
-        // LUT (Look-Up-Table) / Custom Curve
-        else if(g_AccelerationMode == 6 || g_AccelerationMode == 7) {
-            // Assumes the size and values are valid. Please don't change LUT parameters by hand.
-
-            if(speed < g_LutData_x[0]) // Check if the speed is below the first given point
-                speed = g_LutData_y[0];
-            else {
-                int l = 0, r = g_LutSize - 1, best_point = r, iter = 0; // We REALLY don't want an infinity loop in kernel
-                while (l <= r && iter < 10) {
-                    int mid = (r + l) / 2;
-
-                    if (speed > g_LutData_x[mid]) {
-                        l = mid + 1;
-                    } else {
-                        best_point = mid;
-                        r = mid - 1;
-                    }
-
-                    iter++;
-                }
-
-                int index = best_point-1;
-
-                FP_LONG p = g_LutData_y[index];
-                FP_LONG p1 = g_LutData_y[index + 1];
-
-                // denominator should not possibly ever be equal to 0 here... (we all know how this will end)
-                FP_LONG frac = FP64_DivPrecise(speed - g_LutData_x[index],
-                                               g_LutData_x[index + 1] - g_LutData_x[index]);
-
-                speed = FP64_Lerp(p, p1, frac);
-            }
-        }
-
-        else {
-            speed = FP64_1;
-        }
+    } else {
+        speed = FP64_1;
     }
-    else
-        speed = FP64_1; // Set speed to 1 if "below offset"
 
     // Actually apply accelerated sensitivity, allow post-scaling and apply carry from previous round
     // Like RawAccel, sensitivity will be a final multiplier:
@@ -512,16 +333,18 @@ int accelerate(int *x, int *y, int *wheel)
     //carry_whl = delta_whl - *wheel;
 
     // Used to very roughly estimate the performance, and 0.1% lows
-    //ktime_t iter_time = ktime_sub(ktime_get(), now);
-    //elapsed_time += iter_time;
-    //if(iter_time > highest_elapsed_time)
-    //    highest_elapsed_time = iter_time;
-    //if(++iter == 1000) {
-    //    iter = 0;
-    //    pr_info("YeetMouse: Sum of 1000 iters: %lldns, low 0.1%%: %lldns\n", ktime_to_ns(elapsed_time), highest_elapsed_time);
-    //    elapsed_time = 0;
-    //    highest_elapsed_time = 0;
-    //}
+    // ktime_t iter_time = ktime_sub(ktime_get(), now);
+    // static ktime_t elapsed_time, highest_elapsed_time;
+    // static int iter = 0;
+    // elapsed_time += iter_time;
+    // if(iter_time > highest_elapsed_time)
+    //     highest_elapsed_time = iter_time;
+    // if(++iter == 1000) {
+    //     iter = 0;
+    //     pr_info("YeetMouse: Sum of 1000 iters: %lldns, low 0.1%%: %lldns\n", ktime_to_ns(elapsed_time), highest_elapsed_time);
+    //     elapsed_time = 0;
+    //     highest_elapsed_time = 0;
+    // }
 
     return status;
 }

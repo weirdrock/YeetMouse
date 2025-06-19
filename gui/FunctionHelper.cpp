@@ -2,10 +2,6 @@
 
 #include "FunctionHelper.h"
 
-#include <array>
-
-#include "External/ImGui/imgui_internal.h"
-
 CachedFunction::CachedFunction(float xStride, Parameters *params)
         : x_stride(xStride), params(params) { }
 
@@ -30,30 +26,27 @@ float CachedFunction::EvalFuncAt(float x) {
             if (x <= offset_x)
                 val = params->midpoint;
             else
-                val = pow(x * params->accel, params->exponent) + (power_constant / x);
+                val = std::pow(x * params->accel, params->exponent) + (power_constant / x);
 
-            offset_x = pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel;
-            power_constant = offset_x * params->midpoint * params->exponent / (params->exponent + 1);
-
-            pow(x * params->accel, params->exponent) + (((pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel) * params->midpoint * params->exponent / (params->exponent + 1)) / x);
+            //val = std::pow(x * params->accel, params->exponent) + (((std::pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel) * params->midpoint * params->exponent / (params->exponent + 1)) / x);
 
             break;
         }
         case AccelMode_Classic: // Classic
         {
-            val = pow(x * params->accel, params->exponent - 1) + 1;
+            val = std::pow(x * params->accel, params->exponent - 1) + 1;
             break;
         }
         case AccelMode_Motivity: // Motivity
         {
-            val = (params->accel - 1) / (1 + exp(params->midpoint - x)) + 1;
+            val = (params->accel - 1) / (1 + std::exp(params->midpoint - x)) + 1;
             break;
         }
         case AccelMode_Jump: // Jump
         {
             // Might cause issues with high exponent's argument values
             double exp_param = smoothness * (params->midpoint - x);
-            double D = exp(exp_param);
+            double D = std::exp(exp_param);
             if(params->useSmoothing) {
                 double integral = (params->accel - 1) * (x + (log(1 + D) / smoothness));
                 val = ((integral - C0) / x) + 1;
@@ -76,19 +69,21 @@ float CachedFunction::EvalFuncAt(float x) {
 
             // Binary Search for the closest value smaller than x, so the n+1 value is greater than x
             int l = 0, r = params->LUT_size - 1;
-            //while(l <= r) {
-            //    int mid = (r + l) / 2;
+            // while(l <= r) {
+            //     int mid = (r + l) / 2;
             //
-            //    if(x > params->LUT_data_x[mid]) {
-            //        l = mid + 1;
-            //    }
-            //    else if(x < params->LUT_data_x[mid]) {
-            //        r = mid - 1;
-            //    }
-            //    else { // This should never happen
-            //        break;
-            //    }
-            //}
+            //     if(x > params->LUT_data_x[mid]) {
+            //         l = mid + 1;
+            //     }
+            //     else if(x < params->LUT_data_x[mid]) {
+            //         r = mid - 1;
+            //     }
+            //     else { // This should never happen
+            //         break;
+            //     }
+            // }
+            //
+            // int best_point = l;
 
             int best_point = params->LUT_size - 1;
             while (l <= r) {
@@ -102,15 +97,11 @@ float CachedFunction::EvalFuncAt(float x) {
                 }
             }
 
-            l = best_point-1;
-            //printf("Found best x (for %f) idx: %i (%f), val: %f\n", x, l, params->LUT_data_x[l], params->LUT_data_y[l]);
-
-            int pos = l;//std::min(l, (int)params->LUT_size - 2);
+            int pos = std::min(best_point-1, (int)params->LUT_size - 2);
             float p = params->LUT_data_y[(int)(pos)]; // p element
             float p1 = params->LUT_data_y[(int)(pos) + 1]; // p + 1 element
-
             // derived from this (lerp): frac * params->LUT_data_x[l + 1] + params->LUT_data_x[l] = x
-            float frac = (x - params->LUT_data_x[l]) / (params->LUT_data_x[l + 1] - params->LUT_data_x[l]);
+            float frac = (x - params->LUT_data_x[pos]) / (params->LUT_data_x[pos + 1] - params->LUT_data_x[pos]);
 
             //printf("frac: %f\n", frac);
 
@@ -127,8 +118,7 @@ float CachedFunction::EvalFuncAt(float x) {
     return ((params->outCap > 0) ? fminf(val, params->outCap) : val) * params->sens;
 }
 
-void CachedFunction::PreCacheFunc() {
-
+void CachedFunction::PreCacheConstants() {
     // Pre-Cache constants
     switch (params->accelMode) {
         case AccelMode_Current:
@@ -141,7 +131,7 @@ void CachedFunction::PreCacheFunc() {
         }
         case AccelMode_Power:
         {
-            offset_x = pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel;
+            offset_x = std::pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel;
             power_constant = offset_x * params->midpoint * params->exponent / (params->exponent + 1);
             //printf("offset_x = %f, constant = %f\n", offset_x, power_constant);
             break;
@@ -160,7 +150,7 @@ void CachedFunction::PreCacheFunc() {
             smoothness = (2 * M_PI) / (params->exponent * params->midpoint);
             //printf("sm = %.2f\n", smoothness);
             //C0 = params->accel * params->midpoint; // Fast approx
-            C0 = (params->accel - 1) * (smoothness * params->midpoint + logf(1+expf(-smoothness * params->midpoint)))/smoothness;
+            C0 = (params->accel - 1) * (smoothness * params->midpoint + std::log(1+std::exp(-smoothness * params->midpoint)))/smoothness;
             break;
         }
         case AccelMode_Lut:
@@ -176,6 +166,10 @@ void CachedFunction::PreCacheFunc() {
             break;
         }
     }
+}
+
+void CachedFunction::PreCacheFunc() {
+    PreCacheConstants();
 
     float x = -params->offset + 0.01;
     for(int i = 0; i < PLOT_POINTS; i++) {
@@ -200,7 +194,7 @@ bool CachedFunction::ValidateSettings() {
     isValid = true;
 
     for (int i = 0; i < PLOT_POINTS; i++) {
-        if (isnan(values[i]) || isnan(values_y[i]) || isinf(values[i]) || isinf(values_y[i]) || values[i] > 1e5 || values_y[i] > 1e5) {
+        if (std::isnan(values[i]) || std::isnan(values_y[i]) || std::isinf(values[i]) || std::isinf(values_y[i]) || values[i] > 1e5 || values_y[i] > 1e5) {
             isValid = false;
             return isValid;
         }
@@ -217,7 +211,7 @@ bool CachedFunction::ValidateSettings() {
 
     if (params->accelMode == AccelMode_Lut) {
         for (int i = 0; i < MAX_LUT_ARRAY_SIZE; i++) {
-            if (isnan(params->LUT_data_x[i]) || isnan(params->LUT_data_y[i])) {
+            if (std::isnan(params->LUT_data_x[i]) || std::isnan(params->LUT_data_y[i])) {
                 isValid = false;
                 return isValid;
             }
@@ -225,11 +219,11 @@ bool CachedFunction::ValidateSettings() {
     }
 
     if (params->accelMode == AccelMode_Power) {
-        if (pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel > 1e8) {
+        if (std::pow(params->midpoint / (params->exponent + 1), 1 / params->exponent) / params->accel > 1e8) {
             isValid = false;
-            }
+        }
 
-        if (isnan(power_constant) || isinf(power_constant) || isnan(offset_x) || isinf(offset_x)) {
+        if (std::isnan(power_constant) || std::isinf(power_constant) || std::isnan(offset_x) || std::isinf(offset_x)) {
             isValid = false;
         }
     }
@@ -238,7 +232,7 @@ bool CachedFunction::ValidateSettings() {
         if (params->midpoint <= 0)
             isValid = false;
 
-        if (isnan(smoothness) || isinf(smoothness) || isnan(C0) || isinf(C0)) {
+        if (std::isnan(smoothness) || std::isinf(smoothness) || std::isnan(C0) || std::isinf(C0)) {
             isValid = false;
         }
     }

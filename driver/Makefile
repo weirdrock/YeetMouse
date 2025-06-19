@@ -1,5 +1,5 @@
 obj-m += yeetmouse.o
-yeetmouse-objs := accel.o driver.o
+yeetmouse-objs := accel.o driver.o accel_modes.o
 
 # Detect architecture
 ARCH := $(shell uname -m)
