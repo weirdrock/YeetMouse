@@ -99,7 +99,7 @@ unsigned long atoul(const char *str) {
 #define PARAM_UPDATE_UL(param) (atoul(g_param_##param))
 
 // Aggregate values that don't change with speed to save on calculations done every irq
-struct ModesConstants modesConst = { .is_init = false, .C0 = 0, .r = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0, .as_cos = 0, .as_sin = 0, .as_half_threshold = 0 };
+struct ModesConstants modesConst = { .is_init = false, .C0 = 0, .r = 0, .auxiliar_accel = 0, .auxiliar_constant = 0, .accel_sub_1 = 0, .exp_sub_1 = 0, .sin_a = 0, .cos_a = 0, .as_cos = 0, .as_sin = 0, .as_half_threshold = 0 };
 
 static ktime_t g_next_update = 0;
 INLINE void update_params(ktime_t now)
@@ -249,6 +249,9 @@ int accelerate(int *x, int *y, int *wheel)
                 break;
             case AccelMode_Motivity:
                 speed = accel_motivity(speed);
+                break;
+            case AccelMode_Natural:
+                speed = accel_natural(speed);
                 break;
             case AccelMode_Jump:
                 speed = accel_jump(speed);

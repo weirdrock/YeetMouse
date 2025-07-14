@@ -76,7 +76,7 @@ namespace ConfigHelper {
             res_ss << "exponent=" << params.exponent << std::endl;
             res_ss << "midpoint=" << params.midpoint << std::endl;
             res_ss << "preScale=" << params.preScale << std::endl;
-            res_ss << "accelMode=" << params.accelMode << std::endl;
+            res_ss << "accelMode=" << AccelMode2EnumString(params.accelMode) << std::endl;
             res_ss << "useSmoothing=" << params.useSmoothing << std::endl;
             res_ss << "rotation=" << params.rotation << std::endl;
             res_ss << "as_threshold=" << params.as_threshold << std::endl;
@@ -123,7 +123,7 @@ namespace ConfigHelper {
             res_ss << "#define EXPONENT " << params.exponent << std::endl;
             res_ss << "#define MIDPOINT " << params.midpoint << std::endl;
             res_ss << "#define PRESCALE " << params.preScale << std::endl;
-            res_ss << "#define ACCELERATION_MODE " << params.accelMode << std::endl;
+            res_ss << "#define ACCELERATION_MODE " << AccelMode2EnumString(params.accelMode) << std::endl;
             res_ss << "#define USE_SMOOTHING " << params.useSmoothing << std::endl;
             res_ss << "#define ROTATION_ANGLE " << (params.rotation * DEG2RAD) << std::endl;
             res_ss << "#define ANGLE_SNAPPING_THRESHOLD " << (params.as_threshold * DEG2RAD) << std::endl;
@@ -187,7 +187,12 @@ namespace ConfigHelper {
                         STRING_2_LOWERCASE(name);
                     } else if(part_idx == 2) {
                         val_str = part;
-                        val = std::stod(val_str);
+                        try {
+                            val = std::stod(val_str);
+                        }
+                        catch (std::invalid_argument& _) {
+                            val = NAN;
+                        }
                     } else
                         continue;
                 }
@@ -196,8 +201,14 @@ namespace ConfigHelper {
                     STRING_2_LOWERCASE(name);
                     val_str = part.substr(part.find('=') + 1);
                     //printf("val str = %s\n", val_str.c_str());
-                    if(!val_str.empty())
-                        val = std::stod(val_str);
+                    if(!val_str.empty()) {
+                        try {
+                            val = std::stod(val_str);
+                        }
+                        catch (std::invalid_argument& _) {
+                            val = NAN;
+                        }
+                    }
                 }
             }
 
@@ -221,8 +232,13 @@ namespace ConfigHelper {
                 params.midpoint = val;
             else if(name == "prescale")
                 params.preScale = val;
-            else if(name == "accelmode" || name == "acceleration_mode")
-                params.accelMode = static_cast<AccelMode>(std::clamp((int)val, 0, (int)AccelMode_Count-1));
+            else if(name == "accelmode" || name == "acceleration_mode") {
+                if (!std::isnan(val)) // val + 1 below for backward compatibility
+                    params.accelMode = static_cast<AccelMode>(std::clamp((int)val + (val > 4 ? 1 : 0), 0, (int)AccelMode_Count-1));
+                else {
+                    params.accelMode = AccelMode_From_EnumString(val_str);
+                }
+            }
             else if(name == "usesmoothing" || name == "use_smoothing")
                 params.useSmoothing = val;
             else if(name == "rotation" || name == "rotation_angle")
