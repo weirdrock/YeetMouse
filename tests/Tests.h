@@ -45,6 +45,22 @@ public:
 private:
     //static CachedFunction functions[AccelMode_Count];
 
+    class TestSupervisor {
+        bool _result = true;
+        int test_idx = 1;
+        const char* test_name;
+
+    public:
+        explicit TestSupervisor(const char* test_name) : test_name(test_name) { };
+        bool GetResult() const { return _result; }
+
+        bool result = true;
+
+        void NextTest();
+
+        ~TestSupervisor();
+    };
+
     static bool IsAccelValueGood(FP_LONG value);
     static bool IsCloseEnough(FP_LONG value1, float value2, float tolerance = 0.001f);
     static bool IsCloseEnoughRelative(FP_LONG value1, float value2, float tolerance = 0.00001f);

@@ -21,7 +21,7 @@ int main() {
         printf(GREEN"All tests passed!\n" RESET);
     }
     else {
-        printf(RED"%i %s failed the test!\n", bad_sum, (bad_sum == 1) ? "test" : "tests");
+        printf(RED"%i %s failed!\n", bad_sum, (bad_sum == 1) ? "test" : "tests");
     }
 
     return 0;

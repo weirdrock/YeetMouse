@@ -16,7 +16,7 @@ extern "C" {
 }
 #endif"""
 
-sleep(0.1)
+sleep(0.1) # https://preview.redd.it/just-add-sleep-v0-iak44ctwyfba1.jpg?auto=webp&s=352bb4ea528518a97a36600b1271535cf9852b4a
 
 open("driver/accel_modes.h", "w").write(header_contents)
 
