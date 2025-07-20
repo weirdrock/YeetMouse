@@ -198,6 +198,10 @@ FP_LONG accel_natural(FP_LONG speed) {
     return speed;
 }
 
+#ifndef MIN
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#endif
+
 FP_LONG accel_lut(FP_LONG speed) {
     // Assumes the size and values are valid. Please don't change LUT parameters by hand.
 
