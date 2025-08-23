@@ -7,6 +7,7 @@
 #include "driver/accel_modes.h"
 
 #include "../gui/FunctionHelper.h"
+#include "driver/config.h"
 
 //static CachedFunction functions[AccelMode_Count];
 
@@ -146,12 +147,12 @@ bool Tests::TestAccelPower(float range_min, float range_max) {
 bool Tests::TestAccelClassic(float range_min, float range_max) {
     TestSupervisor supervisor{"Classic Mode"};
     try {
+        supervisor.NextTest();
         TestManager::SetAccelMode(AccelMode_Classic);
         TestManager::SetAcceleration(0.01f);
         TestManager::SetExponent(4.f);
+        TestManager::SetUseSmoothing(false);
         TestManager::UpdateModesConstants();
-
-        supervisor.NextTest();
 
         for (int i = 0; i < BASIC_TEST_STEPS; i++) {
             float value = range_min + static_cast<float>(i) * (range_max - range_min) / BASIC_TEST_STEPS;
@@ -160,6 +161,113 @@ bool Tests::TestAccelClassic(float range_min, float range_max) {
             supervisor.result &= IsAccelValueGood(res);
             supervisor.result &= IsCloseEnoughRelative(res, TestManager::EvalFloatFunc(value));
         }
+
+        supervisor.NextTest();
+        TestManager::SetAccelMode(AccelMode_Classic);
+        TestManager::SetAcceleration(0.01f);
+        TestManager::SetExponent(4.f);
+        TestManager::SetMidpoint(6.f);
+        TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        for (int i = 0; i < BASIC_TEST_STEPS; i++) {
+            float value = range_min + static_cast<float>(i) * (range_max - range_min) / BASIC_TEST_STEPS;
+            auto res = TestManager::AccelClassic(value);
+
+            supervisor.result &= IsAccelValueGood(res);
+            supervisor.result &= IsCloseEnoughRelative(res, TestManager::EvalFloatFunc(value));
+        }
+
+        supervisor.NextTest();
+        TestManager::SetAccelMode(AccelMode_Classic);
+        TestManager::SetAcceleration(0.1f);
+        TestManager::SetExponent(3.f);
+        TestManager::SetMidpoint(5.f);
+        TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        for (int i = 0; i < BASIC_TEST_STEPS; i++) {
+            float value = range_min + static_cast<float>(i) * (range_max - range_min) / BASIC_TEST_STEPS;
+            auto res = TestManager::AccelClassic(value);
+
+            supervisor.result &= IsAccelValueGood(res);
+            supervisor.result &= IsCloseEnoughRelative(res, TestManager::EvalFloatFunc(value));
+        }
+
+        supervisor.NextTest();
+        TestManager::SetAccelMode(AccelMode_Classic);
+        TestManager::SetAcceleration(0.1f);
+        TestManager::SetExponent(3.f);
+        TestManager::SetMidpoint(0.f);
+        TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        for (int i = 0; i < BASIC_TEST_STEPS; i++) {
+            float value = range_min + static_cast<float>(i) * (range_max - range_min) / BASIC_TEST_STEPS;
+            auto res = TestManager::AccelClassic(value);
+
+            supervisor.result &= IsAccelValueGood(res);
+            supervisor.result &= IsCloseEnoughRelative(res, TestManager::EvalFloatFunc(value));
+        }
+
+        supervisor.NextTest();
+        TestManager::SetAccelMode(AccelMode_Classic);
+        TestManager::SetAcceleration(0.04f);
+	    TestManager::SetExponent(9.f);
+	    TestManager::SetMidpoint(5.f);
+	    TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        for (int i = 0; i < BASIC_TEST_STEPS; i++) {
+            float value = range_min + static_cast<float>(i) * (range_max - range_min) / BASIC_TEST_STEPS;
+            auto res = TestManager::AccelClassic(value);
+
+            supervisor.result &= IsAccelValueGood(res);
+            supervisor.result &= IsCloseEnoughRelative(res, TestManager::EvalFloatFunc(value));
+        }
+
+        supervisor.NextTest();
+        TestManager::SetAccelMode(AccelMode_Classic);	
+        TestManager::SetAcceleration(0.001f);
+        TestManager::SetExponent(4.f);
+        TestManager::SetMidpoint(0.f);
+        TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        for (int i = 0; i < BASIC_TEST_STEPS; i++) {
+            float value = range_min + static_cast<float>(i) * (range_max - range_min) / BASIC_TEST_STEPS;
+            auto res = TestManager::AccelClassic(value);
+
+            supervisor.result &= IsAccelValueGood(res);
+            supervisor.result &= IsCloseEnoughRelative(res, TestManager::EvalFloatFunc(value));
+        }
+
+        supervisor.NextTest(); 
+        TestManager::SetAccelMode(AccelMode_Classic);
+        TestManager::SetAcceleration(0.4f);
+        TestManager::SetExponent(0.f);
+        TestManager::SetMidpoint(0.f);
+        TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        if (TestManager::ValidateConstants()) { // Should be invalid!
+            fprintf(stderr, "Valid constants (should be invalid)\n");
+            supervisor.result = false;
+        }
+
+        supervisor.NextTest();
+        TestManager::SetAccelMode(AccelMode_Classic);
+        TestManager::SetAcceleration(0.4f);
+        TestManager::SetExponent(1.f);
+        TestManager::SetMidpoint(0.f);
+        TestManager::SetUseSmoothing(true);
+        TestManager::UpdateModesConstants();
+
+        if (TestManager::ValidateConstants()) { // Should be invalid!
+            fprintf(stderr, "Valid constants (should be invalid)\n");
+            supervisor.result = false;
+        }
+
     }
     catch (std::exception &ex) {
         fprintf(stderr, "Exception: %s, in Classic mode\n", ex.what());
