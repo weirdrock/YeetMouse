@@ -124,7 +124,32 @@ float CachedFunction::EvalFuncAt(float x) {
         }
         case AccelMode_Linear: // Linear
         {
-            val = params->accel * x + 1;
+            if (params->useSmoothing) {
+                // The sign is used to have the possibility to
+                // allow negative values
+                float sign = 1.0;
+                float cap_y = params->midpoint - 1.0;
+                float cap_x = 0.0;
+                if (cap_y != 0.0) {
+                    if (cap_y < 0.0) {
+                        cap_y = -cap_y;
+                        sign = -sign;
+                    }
+                    cap_x = (cap_y / 2) / params->accel;
+                }
+                // The following expresions has been simplified
+                // to a single constant expresion
+                // float m = cap_y / 2;
+                // float constant = (m - cap_y) * cap_x;
+                float constant = - cap_y * cap_x / 2;
+                if (x < cap_x) {
+                    val = sign * x * params->accel + 1.0;
+                } else {
+                    val = sign * (constant / x + cap_y) + 1.0;
+                }
+            } else {
+                val = params->accel * x + 1;
+            }
             break;
         }
         case AccelMode_Power: // Power

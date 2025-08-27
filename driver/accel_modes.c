@@ -11,10 +11,10 @@ void update_constants(void) {
     // General
     modesConst.accel_sub_1 = FP64_Sub(g_Acceleration, FP64_1);
     modesConst.exp_sub_1 = FP64_Sub(g_Exponent, FP64_1);
-    modesConst.classic_cap_x = 0;
-    modesConst.classic_cap_y = 0;
-    modesConst.classic_constant = 0;
-    modesConst.classic_sign = FP64_1;
+    modesConst.cap_x = 0;
+    modesConst.cap_y = 0;
+    modesConst.gain_constant = 0;
+    modesConst.sign = FP64_1;
 
     // Synchronous
     if (g_AccelerationMode == AccelMode_Synchronous) {
@@ -38,6 +38,33 @@ void update_constants(void) {
 
             modesConst.minSens = FP64_DivPrecise(FP64_1, g_Motivity);
             modesConst.maxSens = g_Motivity;
+        }
+    }
+
+    // Linear
+    if (g_AccelerationMode == AccelMode_Linear) {
+        if (g_Acceleration == 0) {
+            printk("YeetMouse: Error: Acceleration mode 'Linear' is not supported for acceleration 0.\n");
+            g_Acceleration = 0;
+            g_AccelerationMode = AccelMode_Current;
+        }
+        else if (g_UseSmoothing) {
+            FP_LONG sign = FP64_1;
+            FP_LONG cap_y = FP64_Sub(g_Midpoint, FP64_1);
+            FP_LONG cap_x = FP64_FromInt(0);
+            FP_LONG constant = FP64_FromInt(0);
+            if (cap_y != 0) {
+                if (cap_y < 0) {
+                    cap_y = FP64_Mul(cap_y, Neg1);
+                    sign = Neg1;
+                }
+                cap_x = FP64_DivPrecise(FP64_DivPrecise(cap_y, FP64_FromInt(2)), g_Acceleration);
+            }
+            constant = FP64_DivPrecise(FP64_Mul(FP64_Mul(cap_y, Neg1), cap_x), FP64_FromInt(2));
+            modesConst.cap_x = cap_x;
+            modesConst.cap_y = cap_y;
+            modesConst.gain_constant = constant;
+            modesConst.sign = sign;
         }
     }
 
@@ -65,10 +92,10 @@ void update_constants(void) {
                 constant = FP64_Mul(cap_y, cap_x);
                 constant = FP64_Mul(factor, constant);
                 constant = FP64_Mul(constant, Neg1);
-                modesConst.classic_cap_x = cap_x;
-                modesConst.classic_cap_y = cap_y;
-                modesConst.classic_constant = constant;
-                modesConst.classic_sign = sign;
+                modesConst.cap_x = cap_x;
+                modesConst.cap_y = cap_y;
+                modesConst.gain_constant = constant;
+                modesConst.sign = sign;
             }
         }
     }
@@ -291,7 +318,15 @@ static FP_LONG synchronous_eval(FP_LONG x) {
 }
 
 FP_LONG accel_linear(FP_LONG speed) {
-    speed = FP64_Mul(speed, g_Acceleration);
+    if (g_UseSmoothing) {
+        if (speed < modesConst.cap_x) {
+            speed = FP64_Mul(modesConst.sign, FP64_Mul(speed, g_Acceleration));
+        } else {
+            speed = FP64_Mul(modesConst.sign, FP64_Add(FP64_DivPrecise(modesConst.gain_constant, speed), modesConst.cap_y));
+        }
+    } else {
+        speed = FP64_Mul(speed, g_Acceleration);
+    }
     return FP64_Add(FP64_1, speed);
 }
 
@@ -321,13 +356,13 @@ FP_LONG accel_classic(FP_LONG speed) {
     // point and the function that provides the smooth cap
     if (g_UseSmoothing) {
         // we setup the y cap
-        if (speed < modesConst.classic_cap_x) {
-            accel_classic_result = FP64_Mul(modesConst.classic_sign, accel_classic_result);
+        if (speed < modesConst.cap_x) {
+            accel_classic_result = FP64_Mul(modesConst.sign, accel_classic_result);
             speed = FP64_Add(accel_classic_result, FP64_1);
         } else {
-            speed = FP64_Add(FP64_Mul(modesConst.classic_sign,
-                                      FP64_Add(FP64_DivPrecise(modesConst.classic_constant, speed),
-                                               modesConst.classic_cap_y)), FP64_1);
+            speed = FP64_Add(FP64_Mul(modesConst.sign,
+                                      FP64_Add(FP64_DivPrecise(modesConst.gain_constant, speed),
+                                               modesConst.cap_y)), FP64_1);
         }
     } else
         speed = FP64_Add(accel_classic_result, FP64_1);

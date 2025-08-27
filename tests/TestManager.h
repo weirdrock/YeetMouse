@@ -14,7 +14,7 @@ class TestManager {
     //static TestManager& GetInstance();
     static void Initialize();
 
-    static FP_LONG AccelLinear(FP_LONG x, FP_LONG acceleration);
+    static FP_LONG AccelLinear(FP_LONG x, FP_LONG acceleration, bool gain, FP_LONG midpoint);
     static FP_LONG AccelPower(FP_LONG x, FP_LONG acceleration, FP_LONG exponent, FP_LONG midpoint);
     static FP_LONG AccelClassic(FP_LONG x, FP_LONG acceleration, FP_LONG exponent);
     static FP_LONG AccelMotivity(FP_LONG x, FP_LONG acceleration, FP_LONG exponent, FP_LONG midpoint);
@@ -23,7 +23,7 @@ class TestManager {
     static FP_LONG AccelLUT(FP_LONG x, FP_LONG values_x[], FP_LONG values_y[], unsigned long count);
     static FP_LONG AccelLUT(FP_LONG x);
 
-    static FP_LONG AccelLinear(float x, float acceleration);
+    static FP_LONG AccelLinear(float x, float acceleration, bool gain, float midpoint);
     static FP_LONG AccelPower(float x, float acceleration, float exponent, float midpoint);
     static FP_LONG AccelClassic(float x, float acceleration, float exponent);
     static FP_LONG AccelMotivity(float x, float acceleration, float exponent, float midpoint);

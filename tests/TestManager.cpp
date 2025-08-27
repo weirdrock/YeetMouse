@@ -34,8 +34,10 @@ void TestManager::Initialize() {
     function.PreCacheConstants();
 }
 
-FP_LONG TestManager::AccelLinear(FP_LONG x, FP_LONG acceleration) {
+FP_LONG TestManager::AccelLinear(FP_LONG x, FP_LONG acceleration, bool gain, FP_LONG midpoint) {
     SetAcceleration(acceleration);
+    SetUseSmoothing(gain);
+    SetMidpoint(midpoint);
     UpdateModesConstants();
     return accel_linear(x);
 }
@@ -94,8 +96,8 @@ FP_LONG TestManager::AccelLUT(FP_LONG x) {
     return accel_lut(x);
 }
 
-FP_LONG TestManager::AccelLinear(float x, float acceleration) {
-    return AccelLinear(FP64_FromFloat(x), FP64_FromFloat(acceleration));
+FP_LONG TestManager::AccelLinear(float x, float acceleration, bool gain, float midpoint) {
+    return AccelLinear(FP64_FromFloat(x), FP64_FromFloat(acceleration), gain, FP64_FromFloat(midpoint));
 }
 
 FP_LONG TestManager::AccelPower(float x, float acceleration, float exponent, float midpoint) {

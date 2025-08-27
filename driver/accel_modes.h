@@ -22,10 +22,10 @@ struct ModesConstants {
     FP_LONG maxSens;
 
     // Classic
-    FP_LONG classic_sign;
-    FP_LONG classic_constant;
-    FP_LONG classic_cap_x;
-    FP_LONG classic_cap_y;
+    FP_LONG sign;
+    FP_LONG gain_constant;
+    FP_LONG cap_x;
+    FP_LONG cap_y;
 
     // Jump
     FP_LONG C0; // the "integral" evaluated at 0
