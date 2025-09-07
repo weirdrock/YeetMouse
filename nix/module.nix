@@ -442,15 +442,19 @@ let
     };
   };
 
-  yeetmouse = pkgs.yeetmouse.override {
-    kernel = config.boot.kernelPackages.kernel;
-  };
+  
 in {
   options.hardware.yeetmouse = {
     enable = mkOption {
       type = types.bool;
       default = false;
       description = "Enable yeetmouse kernel module to add configurable mouse acceleration";
+    };
+
+    package = mkOption {
+    	type = types.package;
+    	default = pkgs.yeetmouse.override { kernel = config.boot.kernelPackages.kernel; };
+    	description = "The package to be used by the module";
     };
 
     sensitivity = let
@@ -565,8 +569,8 @@ in {
   config = mkIf cfg.enable {
     nixpkgs.overlays = [ yeetmouseOverlay ];
 
-    boot.extraModulePackages = [ yeetmouse ];
-    environment.systemPackages = [ yeetmouse ];
+    boot.extraModulePackages = [ cfg.package ];
+    environment.systemPackages = [ cfg.package ];
     services.udev = {
       extraRules = let
         echo = "${pkgs.coreutils}/bin/echo";
